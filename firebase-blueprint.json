@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "CmsModule": {
+      "title": "CmsModule",
+      "description": "Authoritative persistent CMS module data",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string" },
+        "data": { "type": "object" },
+        "version": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["moduleId", "data"]
+    }
+  },
+  "firestore": {
+    "/cms_modules/{moduleId}": {
+      "schema": "CmsModule",
+      "description": "Individual CMS collections and documents"
+    }
+  }
+}

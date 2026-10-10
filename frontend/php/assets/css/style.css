@@ -1,0 +1,52 @@
+/* Ishwari Secondary School - Professional Institutional Stylesheet */
+:root {
+    --bg-main: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --primary-navy: #0b192c;
+    --accent-amber: #d97706;
+}
+
+html.dark {
+    --bg-main: #090e17;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #1e293b;
+    --primary-navy: #040811;
+    --accent-amber: #f59e0b;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Neumorphic Sliding Language Toggle */
+.neumorphic-lang-toggle {
+    background: #0f172a;
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.5), inset -2px -2px 5px rgba(255, 255, 255, 0.05);
+}
+
+.neumorphic-thumb {
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Minimalist Flat UI Theme Toggle */
+.flat-theme-toggle {
+    transition: background-color 0.2s ease;
+}
+
+.flat-theme-toggle-thumb {
+    transition: transform 0.2s ease;
+}
+
+/* Hide scrollbars for navigation tabs while preserving scroll */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

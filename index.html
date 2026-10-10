@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ne">
+  <head>
+    <script>
+      (function () {
+        if (typeof window !== 'undefined') {
+
+          // 1. Silent dummy WebSocket for Vite HMR in cloud preview/iframe environments
+          var NativeWS = window.WebSocket;
+          if (NativeWS) {
+            function ViteHmrSilentWebSocket(url, protocols) {
+              var isHmr = (
+                protocols === 'vite-hmr' ||
+                protocols === 'vite-ping' ||
+                (typeof url === 'string' && (url.indexOf('token=') !== -1 || url.indexOf('24678') !== -1))
+              );
+              if (isHmr) {
+                var listeners = {};
+                var dummy = {
+                  url: url,
+                  protocol: protocols || '',
+                  extensions: '',
+                  binaryType: 'blob',
+                  bufferedAmount: 0,
+                  readyState: 1, // OPEN immediately
+                  CONNECTING: 0,
+                  OPEN: 1,
+                  CLOSING: 2,
+                  CLOSED: 3,
+                  send: function () {},
+                  close: function () {},
+                  addEventListener: function (evt, fn) {
+                    if (!listeners[evt]) listeners[evt] = [];
+                    listeners[evt].push(fn);
+                    if (evt === 'open') {
+                      setTimeout(function () { try { fn({ type: 'open' }); } catch (e) {} }, 0);
+                    }
+                  },
+                  removeEventListener: function (evt, fn) {
+                    if (listeners[evt]) {
+                      listeners[evt] = listeners[evt].filter(function (f) { return f !== fn; });
+                    }
+                  },
+                  dispatchEvent: function () { return true; },
+                  onopen: null,
+                  onclose: null,
+                  onerror: null,
+                  onmessage: null
+                };
+                setTimeout(function () {
+                  if (typeof dummy.onopen === 'function') {
+                    try { dummy.onopen({ type: 'open' }); } catch (e) {}
+                  }
+                }, 0);
+                return dummy;
+              }
+              return new NativeWS(url, protocols);
+            }
+            ViteHmrSilentWebSocket.CONNECTING = 0;
+            ViteHmrSilentWebSocket.OPEN = 1;
+            ViteHmrSilentWebSocket.CLOSING = 2;
+            ViteHmrSilentWebSocket.CLOSED = 3;
+            ViteHmrSilentWebSocket.prototype = NativeWS.prototype;
+            window.WebSocket = ViteHmrSilentWebSocket;
+          }
+
+          // 2. Suppress benign Vite HMR WebSocket connection logs & external browser extension errors
+          var isIgnoredError = function (arg, filename) {
+            if (filename && (filename.indexOf('chrome-extension://') !== -1 || filename.indexOf('moz-extension://') !== -1)) return true;
+            if (!arg) return false;
+            var msg = typeof arg === 'string' ? arg : (arg.message || arg.reason || arg.stack || String(arg));
+            return (
+              msg.indexOf('[vite]') !== -1 ||
+              msg.indexOf('WebSocket') !== -1 ||
+              msg.indexOf('websocket') !== -1 ||
+              msg.indexOf('failed to connect to websocket') !== -1 ||
+              msg.indexOf('WebSocket closed without opened') !== -1 ||
+              msg.indexOf('chrome-extension://') !== -1 ||
+              msg.indexOf('moz-extension://') !== -1 ||
+              msg.indexOf('Cannot set property fetch') !== -1 ||
+              msg.indexOf('which has only a getter') !== -1
+            );
+          };
+
+          var origDebug = console.debug;
+          console.debug = function () {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isIgnoredError(arguments[i])) return;
+            }
+            if (origDebug) origDebug.apply(console, arguments);
+          };
+
+          var origError = console.error;
+          console.error = function () {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isIgnoredError(arguments[i])) return;
+            }
+            if (origError) origError.apply(console, arguments);
+          };
+
+          var origWarn = console.warn;
+          console.warn = function () {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isIgnoredError(arguments[i])) return;
+            }
+            if (origWarn) origWarn.apply(console, arguments);
+          };
+
+          window.addEventListener(
+            'unhandledrejection',
+            function (event) {
+              if (isIgnoredError(event.reason)) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+              }
+            },
+            true
+          );
+
+          window.addEventListener(
+            'error',
+            function (event) {
+              if (
+                isIgnoredError(event.error, event.filename) ||
+                isIgnoredError(event.message, event.filename)
+              ) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+              }
+            },
+            true
+          );
+
+          var origOnError = window.onerror;
+          window.onerror = function (msg, url, lineNo, columnNo, error) {
+            if (isIgnoredError(msg, url) || isIgnoredError(error, url)) {
+              return true;
+            }
+            if (origOnError) return origOnError.apply(this, arguments);
+          };
+        }
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shree Ishwari Secondary School, Baijanath-5, Banke | श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ ५, बाँके</title>
+    <meta name="description" content="Official institutional web portal for Shree Ishwari Secondary School, Baijanath-5, Banke (श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ ५, बाँके) featuring full academic programs, curriculum guidelines, notices, and CMS portal." />
+    <meta property="og:title" content="Shree Ishwari Secondary School, Baijanath-5, Banke | श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ ५, बाँके" />
+    <meta property="og:description" content="Official institutional web portal for Shree Ishwari Secondary School, Baijanath-5, Banke (श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ ५, बाँके) featuring full academic programs, curriculum guidelines, notices, and CMS portal." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#1E3A8A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="IshwariSchool" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/frontend/main.tsx"></script>
+  </body>
+</html>
+

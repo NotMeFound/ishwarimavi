@@ -1,0 +1,6 @@
+{
+  "name": "Ishwari Secondary School",
+  "description": "Official institutional web portal for Ishwari Secondary School (ईश्वरी माध्यमिक विद्यालय) featuring full security, customizable branding, dedicated admin routing, and complete administrative website control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

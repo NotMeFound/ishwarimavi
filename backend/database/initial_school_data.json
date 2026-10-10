@@ -1,0 +1,25 @@
+{
+  "school": {
+    "name_en": "Ishwari Secondary School",
+    "name_np": "ईश्वरी माध्यमिक विद्यालय",
+    "tagline_en": "Center for Academic Excellence & Character Building",
+    "tagline_np": "शैक्षिक उत्कृष्टता र चरित्र निर्माणको अग्रणी केन्द्र",
+    "affiliation_en": "Government of Nepal Model School",
+    "affiliation_np": "नेपाल सरकार नमुना विद्यालय",
+    "code": "EMIS: 48012004",
+    "estd_bs": "2035 B.S.",
+    "estd_ad": "1978 A.D.",
+    "phone": "+977-01-5542109 / 9851234567",
+    "email": "info@ishwari.edu.np",
+    "address_en": "Ward No. 4, Nepal",
+    "address_np": "वडा नं. ४, नेपाल",
+    "principal_en": "Mr. Narayan Prasad Koirala",
+    "principal_np": "श्री नारायण प्रसाद कोइराला"
+  },
+  "stats": [
+    {"value": "1,240+", "label_en": "Enrolled Students", "label_np": "अध्ययनरत विद्यार्थी"},
+    {"value": "52", "label_en": "Faculty Members", "label_np": "योग्य शिक्षक तथा कर्मचारी"},
+    {"value": "48", "label_en": "Glorious Years", "label_np": "गौरवमय इतिहास"},
+    {"value": "100%", "label_en": "SEE Success Rate", "label_np": "एसईई सफलता दर"}
+  ]
+}

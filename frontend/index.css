@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --brand-primary: #1E3A8A;
+    --brand-hover: #1D4ED8;
+    --brand-subtle: #F1F5F9;
+    --brand-dark: #0F172A;
+  }
+
+  body {
+    font-family: 'Mukta', 'Noto Sans Devanagari', 'Kalimati', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom scrollbar and smooth transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Monochromatic line icons styling */
+svg {
+  stroke-width: 1.8px;
+}
+
+/* Continuous horizontal ticker animation */
+@keyframes tickerMarquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-ticker-continuous {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: tickerMarquee 35s linear infinite;
+  will-change: transform;
+}
+
+.animate-ticker-continuous:hover {
+  animation-play-state: paused;
+}
+
+/* Realistic natural wind fabric wave animation for Nepal double-pennant flag */
+@keyframes nepalFlagWindWave {
+  0% {
+    transform: perspective(300px) rotateY(0deg) skewY(0deg) scaleX(1);
+  }
+  25% {
+    transform: perspective(300px) rotateY(-7deg) skewY(2.2deg) scaleX(0.975);
+  }
+  50% {
+    transform: perspective(300px) rotateY(3deg) skewY(-1.8deg) scaleX(0.99);
+  }
+  75% {
+    transform: perspective(300px) rotateY(-5deg) skewY(1.4deg) scaleX(0.98);
+  }
+  100% {
+    transform: perspective(300px) rotateY(0deg) skewY(0deg) scaleX(1);
+  }
+}
+
+.animate-flag-wave {
+  animation: nepalFlagWindWave 3.6s ease-in-out infinite;
+  transform-origin: left center;
+  will-change: transform;
+}
+
+/* Accessibility settings */
+html.text-size-sm {
+  font-size: 14px;
+}
+
+html.text-size-lg {
+  font-size: 18px;
+}
+
+html.high-contrast {
+  filter: contrast(1.15);
+}
+
+html.high-contrast body {
+  --tw-border-opacity: 0.9 !important;
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* System-level prefers-reduced-motion support */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Print Notice Media Styles */
+@media print {
+  /* Hide non-printable public components */
+  header,
+  footer,
+  nav,
+  .no-print,
+  button,
+  [role="dialog"] > div:first-child,
+  .floating-controls {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make sure notice printable area takes full page */
+  .printable-notice-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 20mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .printable-notice-area * {
+    color: #000000 !important;
+    background: transparent !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+

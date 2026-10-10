@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#blueGrad)" />
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-dasharray="16 8" />
+  
+  <!-- Academic Crest Emblem -->
+  <!-- Open Book -->
+  <path d="M140 330 C180 300 230 310 256 325 C282 310 332 300 372 330 L372 230 C332 200 282 210 256 225 C230 210 180 200 140 230 Z" fill="#FFFFFF" opacity="0.95" />
+  <path d="M256 225 L256 325" stroke="#1E3A8A" stroke-width="4" stroke-linecap="round" />
+  
+  <!-- Graduation Cap / Temple Peak -->
+  <polygon points="256,120 370,175 256,230 142,175" fill="url(#goldGrad)" />
+  <path d="M370 175 L370 235 C370 240 365 245 360 245 C355 245 350 240 350 235 L350 185" stroke="#F59E0B" stroke-width="5" stroke-linecap="round" fill="none" />
+  <circle cx="360" cy="250" r="8" fill="#F59E0B" />
+
+  <!-- Laurel Wreath -->
+  <path d="M120 270 C110 330 150 390 210 410" fill="none" stroke="url(#goldGrad)" stroke-width="7" stroke-linecap="round" />
+  <path d="M392 270 C402 330 362 390 302 410" fill="none" stroke="url(#goldGrad)" stroke-width="7" stroke-linecap="round" />
+  
+  <!-- Star -->
+  <polygon points="256,380 263,398 282,398 267,409 272,427 256,416 240,427 245,409 230,398 249,398" fill="url(#goldGrad)" />
+</svg>
