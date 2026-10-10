@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build:client": "vite build",
-    "build:server": "esbuild backend/server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --define:IS_PRODUCTION_BUILD=true --outfile=dist/server.js && esbuild backend/server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --define:IS_PRODUCTION_BUILD=true --outfile=dist/server.cjs && esbuild backend/vercelHandler.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.js && cp api/index.js api/[...slug].js",
+    "build:server": "node scripts/build-server.mjs",
     "build": "vite build && npm run build:server",
     "render-build": "npm run build",
     "prestart": "node -e \"const fs = require('fs'); if (!fs.existsSync('dist/server.js') || !fs.existsSync('dist/server.cjs')) { console.log('[Server] Auto-building production server bundles...'); require('child_process').execSync('npm run build:server', { stdio: 'inherit' }); }\" 2>/dev/null || true",

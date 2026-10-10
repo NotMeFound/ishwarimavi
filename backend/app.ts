@@ -115,9 +115,10 @@ export function createApp(): express.Application {
   });
 
   // Mount API Router
+  // Keep the authoritative API under /api and /auth namespaces so browser page routes like
+  // /about, /contact, /facilities, etc. are not intercepted by JSON convenience endpoints.
   app.use('/api', apiRouter);
   app.use('/auth', apiRouter);
-  app.use(apiRouter);
 
   // Catch-all for unhandled /api routes - strictly returns JSON
   app.use('/api', (req: Request, res: Response) => {

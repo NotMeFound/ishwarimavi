@@ -4967,7 +4967,6 @@ function createApp() {
   });
   app2.use("/api", apiRouter);
   app2.use("/auth", apiRouter);
-  app2.use(apiRouter);
   app2.use("/api", (req, res) => {
     const msg = `API endpoint not found: ${req.method} ${req.originalUrl}`;
     res.status(404).json({

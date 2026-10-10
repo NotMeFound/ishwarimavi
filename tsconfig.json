@@ -15,6 +15,9 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
     "paths": {
       "@/*": [
         "./frontend/*",
@@ -24,7 +27,8 @@
     },
     "types": [
       "vite/client",
-      "vite-plugin-pwa/client"
+      "vite-plugin-pwa/client",
+      "node"
     ]
   }
 }
