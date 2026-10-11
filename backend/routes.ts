@@ -1,25 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import crypto from 'crypto';
 import { db, ServerSession, verifyPasswordBcrypt, hashPasswordBcrypt } from './db';
-import {
-  AdminAccount,
-  StaffMember,
-  SchoolEvent,
-  Achievement,
-  HistoryItem,
-  CurriculumGuideline,
-  Vacancy
-} from './types';
-import { ALL_PERMISSIONS } from '../frontend/utils/security';
+import { AdminAccount } from './types';
 
 export const apiRouter = express.Router();
-
-const isServerlessEnvironment = Boolean(
-  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
-);
 
 // Helper to create minimal valid PDF files for seeded sample curriculum resources
 function createSamplePdf(title: string, grade: string): Buffer {
@@ -31,23 +17,18 @@ function createSamplePdf(title: string, grade: string): Buffer {
 
 // Backend storage directories helper
 function getBackendUploadDir(category: string): string {
-  const baseDir = isServerlessEnvironment
-    ? path.join(os.tmpdir(), 'ishwari_uploads')
-    : path.join(process.cwd(), 'backend', 'uploads');
-  const targetDir = path.join(baseDir, category);
-  if (!fs.existsSync(targetDir)) {
+  const backendDir = path.join(process.cwd(), 'backend', 'uploads', category);
+  if (!fs.existsSync(backendDir)) {
     try {
-      fs.mkdirSync(targetDir, { recursive: true });
+      fs.mkdirSync(backendDir, { recursive: true });
     } catch (e) {
-      console.warn('Could not create backend upload directory:', targetDir, e);
+      console.warn('Could not create backend upload directory:', backendDir, e);
     }
   }
-  return targetDir;
+  return backendDir;
 }
 
 function resolveUploadFilePath(category: string, filename: string): string | null {
-  const pTmp = path.join(os.tmpdir(), 'ishwari_uploads', category, filename);
-  if (fs.existsSync(pTmp)) return pTmp;
   const pBackend = path.join(process.cwd(), 'backend', 'uploads', category, filename);
   if (fs.existsSync(pBackend)) return pBackend;
   const pData = path.join(process.cwd(), 'data', 'uploads', category, filename);
@@ -100,69 +81,41 @@ export function extractToken(req: Request): string | undefined {
 }
 
 // Authentication middleware for privileged operations
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  try {
-    await db.ensureLoaded();
-    const token = extractToken(req);
-    const session = db.validateSession(token);
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  const session = db.validateSession(token);
 
-    if (!session) {
-      res.status(401).json({
-        success: false,
-        error: 'Authentication session expired or invalid. Please log in to proceed.'
-      });
-      return;
-    }
-
-    (req as any).session = session;
-    next();
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Database session validation error' });
+  if (!session) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication session expired or invalid. Please log in to proceed.'
+    });
+    return;
   }
+
+  (req as any).session = session;
+  next();
 }
 
-// 1. Authoritative Production Health Check
-apiRouter.get('/health', async (req: Request, res: Response) => {
-  const requestId = (req as any).requestId || req.headers['x-request-id'] || 'req_health';
-  const dbHealth = await db.checkDatabaseHealth();
+// 1. Health check
+apiRouter.get('/health', (req: Request, res: Response) => {
   const versionInfo = db.getVersion();
-
-  const overallStatus: 'healthy' | 'degraded' | 'unavailable' =
-    dbHealth.status === 'healthy'
-      ? 'healthy'
-      : dbHealth.status === 'degraded'
-      ? 'degraded'
-      : 'unavailable';
-
-  const statusCode = overallStatus === 'healthy' ? 200 : overallStatus === 'degraded' ? 200 : 503;
-
-  res.status(statusCode).json({
-    success: overallStatus !== 'unavailable',
-    status: overallStatus,
-    requestId,
-    runtime: {
-      uptimeSeconds: Math.floor(process.uptime()),
-      nodeVersion: process.version,
-      memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
-    },
-    database: {
-      status: dbHealth.status,
-      latencyMs: dbHealth.latencyMs,
-      version: versionInfo.version,
-      lastModified: versionInfo.lastModified,
-      ...(dbHealth.errorCategory ? { errorCategory: dbHealth.errorCategory } : {})
-    },
+  res.json({
+    success: true,
+    status: 'ok',
+    version: versionInfo.version,
+    lastModified: versionInfo.lastModified,
+    uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
 });
 
 // 2. Authoritative Database State
-apiRouter.get('/cms/state', async (req: Request, res: Response) => {
+apiRouter.get('/cms/state', (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
-  await db.ensureLoaded();
   const token = extractToken(req);
   const session = db.validateSession(token);
   const state = db.getState();
@@ -217,10 +170,9 @@ apiRouter.get('/cms/state', async (req: Request, res: Response) => {
 });
 
 // 3. Ultra-lightweight Version Check (For Polling & Tab Resumption)
-apiRouter.get('/cms/version', async (req: Request, res: Response) => {
+apiRouter.get('/cms/version', (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
-  await db.ensureLoaded();
   const versionInfo = db.getVersion();
   res.json({
     success: true,
@@ -230,169 +182,23 @@ apiRouter.get('/cms/version', async (req: Request, res: Response) => {
 });
 
 // 3.1 Public Module Convenience Endpoints
-apiRouter.get('/notices', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/notices', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().notices || [] });
 });
 
-apiRouter.post('/notices', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'notices');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, category, description_en, description_np, is_pinned, is_published, file_name, file_url } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'Notice title in English is required' });
-  }
-  const notices = [...(db.getState().notices || [])];
-  const todayIso = new Date().toISOString().split('T')[0];
-  const newNotice = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    date_en: todayIso,
-    date_np: '२०८३',
-    category: category || 'academic',
-    pinned: Boolean(is_pinned),
-    is_pinned: Boolean(is_pinned),
-    published: is_published !== false,
-    is_published: is_published !== false,
-    status: (is_published !== false ? 'published' : 'draft') as 'published' | 'draft',
-    file_name: file_name || '',
-    file_data: file_url || '',
-    description_en: description_en || '',
-    description_np: description_np || '',
-    updated_at: new Date().toISOString()
-  };
-  notices.unshift(newNotice);
-  await db.updateModule('notices', notices, `@${session.username}`);
-  res.status(201).json({ success: true, data: newNotice });
-});
-
-apiRouter.put('/notices/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'notices');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const notices = [...(db.getState().notices || [])];
-  const idx = notices.findIndex((n: any) => String(n.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Notice not found' });
-  }
-  notices[idx] = { ...notices[idx], ...req.body, updated_at: new Date().toISOString() };
-  await db.updateModule('notices', notices, `@${session.username}`);
-  res.json({ success: true, data: notices[idx] });
-});
-
-apiRouter.delete('/notices/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'notices');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let notices = [...(db.getState().notices || [])];
-  const prevCount = notices.length;
-  notices = notices.filter((n: any) => String(n.id) !== String(req.params.id));
-  if (notices.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Notice not found' });
-  }
-  await db.updateModule('notices', notices, `@${session.username}`);
-  res.json({ success: true, message: 'Notice deleted successfully' });
-});
-
-apiRouter.get('/documents', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().documents || [] });
-});
-
-apiRouter.post('/documents', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'documents');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, category, file_name, file_url, file_size_kb } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'Document title is required' });
-  }
-  if (file_name && !file_name.toLowerCase().endsWith('.pdf')) {
-    return res.status(400).json({ success: false, error: 'Documents must be in PDF format only' });
-  }
-  if (file_size_kb && file_size_kb > 200) {
-    return res.status(400).json({ success: false, error: 'Document size exceeds 200 KB limit' });
-  }
-  const documents = [...(db.getState().documents || [])];
-  const newDoc = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    type: 'PDF',
-    size: file_size_kb ? `${file_size_kb} KB` : '100 KB',
-    date: new Date().toISOString().split('T')[0],
-    category: category || 'general',
-    file_name: file_name || '',
-    file_data: file_url || '',
-    file_size_kb: file_size_kb || 0,
-    status: 'published' as const
-  };
-  documents.unshift(newDoc);
-  await db.updateModule('documents', documents, `@${session.username}`);
-  res.status(201).json({ success: true, data: newDoc });
-});
-
-apiRouter.delete('/documents/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'documents');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let docs = [...(db.getState().documents || [])];
-  const prevCount = docs.length;
-  docs = docs.filter((d: any) => String(d.id) !== String(req.params.id));
-  if (docs.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Document not found' });
-  }
-  await db.updateModule('documents', docs, `@${session.username}`);
-  res.json({ success: true, message: 'Document deleted successfully' });
-});
-
-apiRouter.get('/site-settings', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: { school: db.getState().school, siteConfig: db.getState().siteConfig } });
-});
-
-apiRouter.put('/site-settings', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'siteConfig');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const batch: any = {};
-  if (req.body.school) batch.school = { ...db.getState().school, ...req.body.school };
-  if (req.body.siteConfig) batch.siteConfig = { ...db.getState().siteConfig, ...req.body.siteConfig };
-  await db.updateBatch(batch, `@${session.username}`);
-  res.json({ success: true, message: 'Site settings updated successfully' });
-});
-
-apiRouter.get('/gallery', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/gallery', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().gallery || [] });
 });
 
-apiRouter.get('/teachers', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/teachers', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().staff || [] });
 });
 
-apiRouter.get('/staff', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/staff', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().staff || [] });
 });
 
-apiRouter.get('/programs', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/programs', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().programs || [] });
 });
 
@@ -400,638 +206,16 @@ apiRouter.get('/alumni', (req: Request, res: Response) => {
   res.json({ success: true, data: [] });
 });
 
-apiRouter.get('/faqs', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  const publicData = db.getPublicState();
-  res.json({ success: true, data: publicData.faqs || [] });
+apiRouter.get('/faqs', (req: Request, res: Response) => {
+  res.json({ success: true, data: db.getState().faqs || [] });
 });
 
-apiRouter.get('/events', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/events', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().events || [] });
 });
 
-apiRouter.get('/facilities', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/facilities', (req: Request, res: Response) => {
   res.json({ success: true, data: db.getState().facilities || [] });
-});
-
-/* ---------------- COMPREHENSIVE AUTHORITATIVE REST CRUD ENDPOINTS ---------------- */
-
-// Staff / Teachers / SMC CRUD
-apiRouter.post('/staff', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'staff');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { name_en, name_np, designation_en, designation_np, role_type, category, phone, email, qualification_en, image, bio_en, bio_np, display_order } = req.body;
-  if (!name_en) {
-    return res.status(400).json({ success: false, error: 'Staff name in English is required' });
-  }
-  const staff = [...(db.getState().staff || [])];
-  const newMember: StaffMember = {
-    id: Date.now(),
-    name_en,
-    name_np: name_np || name_en,
-    role: (role_type as any) || 'teacher',
-    designation_en: designation_en || 'Faculty Member',
-    designation_np: designation_np || designation_en || 'शिक्षक',
-    experience: req.body.experience || '',
-    contact_phone: phone || '',
-    contact_email: email || '',
-    qualification_en: qualification_en || '',
-    image: image || '',
-    bio_en: bio_en || '',
-    bio_np: bio_np || '',
-    display_order: Number(display_order) || staff.length + 1,
-    isActive: true,
-    published: true
-  };
-  staff.push(newMember);
-  await db.updateModule('staff', staff, `@${session.username}`);
-  res.status(201).json({ success: true, data: newMember });
-});
-
-apiRouter.put('/staff/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'staff');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const staff = [...(db.getState().staff || [])];
-  const idx = staff.findIndex((s: any) => String(s.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Staff member not found' });
-  }
-  staff[idx] = { ...staff[idx], ...req.body };
-  await db.updateModule('staff', staff, `@${session.username}`);
-  res.json({ success: true, data: staff[idx] });
-});
-
-apiRouter.delete('/staff/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'staff');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let staff = [...(db.getState().staff || [])];
-  const prevCount = staff.length;
-  staff = staff.filter((s: any) => String(s.id) !== String(req.params.id));
-  if (staff.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Staff member not found' });
-  }
-  await db.updateModule('staff', staff, `@${session.username}`);
-  res.json({ success: true, message: 'Staff member deleted successfully' });
-});
-
-// Events CRUD
-apiRouter.post('/events', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'events');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, date_en, date_np, time_range, location_en, location_np, description_en, description_np, category, image, is_featured } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'Event title is required' });
-  }
-  const events = [...(db.getState().events || [])];
-  const newEvent: SchoolEvent = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    date_en: date_en || new Date().toISOString().split('T')[0],
-    date_np: date_np || '२०८३',
-    time: time_range || '10:00 AM - 4:00 PM',
-    venue_en: location_en || 'School Campus',
-    venue_np: location_np || 'विद्यालय परिसर',
-    desc_en: description_en || '',
-    desc_np: description_np || '',
-    category: (category as any) || 'academic',
-    image: image || '',
-    featured: Boolean(is_featured),
-    status: 'published'
-  };
-  events.unshift(newEvent);
-  await db.updateModule('events', events, `@${session.username}`);
-  res.status(201).json({ success: true, data: newEvent });
-});
-
-apiRouter.put('/events/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'events');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const events = [...(db.getState().events || [])];
-  const idx = events.findIndex((e: any) => String(e.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Event not found' });
-  }
-  events[idx] = { ...events[idx], ...req.body };
-  await db.updateModule('events', events, `@${session.username}`);
-  res.json({ success: true, data: events[idx] });
-});
-
-apiRouter.delete('/events/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'events');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let events = [...(db.getState().events || [])];
-  const prevCount = events.length;
-  events = events.filter((e: any) => String(e.id) !== String(req.params.id));
-  if (events.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Event not found' });
-  }
-  await db.updateModule('events', events, `@${session.username}`);
-  res.json({ success: true, message: 'Event deleted successfully' });
-});
-
-// Achievements CRUD
-apiRouter.get('/achievements', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().achievements || [] });
-});
-
-apiRouter.post('/achievements', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'achievements');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, category, year_bs, year_ad, description_en, description_np, image, student_name, rank_or_award } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'Achievement title is required' });
-  }
-  const achievements = [...(db.getState().achievements || [])];
-  const newAch: Achievement = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    year: String(year_bs || year_ad || '२०८०'),
-    desc_en: description_en || '',
-    desc_np: description_np || '',
-    category: (category as any) || 'academic',
-    image: image || '',
-    student_name_en: student_name || '',
-    position_rank: rank_or_award || '',
-    published: true
-  };
-  achievements.unshift(newAch);
-  await db.updateModule('achievements', achievements, `@${session.username}`);
-  res.status(201).json({ success: true, data: newAch });
-});
-
-apiRouter.put('/achievements/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'achievements');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const achievements = [...(db.getState().achievements || [])];
-  const idx = achievements.findIndex((a: any) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Achievement not found' });
-  }
-  achievements[idx] = { ...achievements[idx], ...req.body };
-  await db.updateModule('achievements', achievements, `@${session.username}`);
-  res.json({ success: true, data: achievements[idx] });
-});
-
-apiRouter.delete('/achievements/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'achievements');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let achievements = [...(db.getState().achievements || [])];
-  const prevCount = achievements.length;
-  achievements = achievements.filter((a: any) => String(a.id) !== String(req.params.id));
-  if (achievements.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Achievement not found' });
-  }
-  await db.updateModule('achievements', achievements, `@${session.username}`);
-  res.json({ success: true, message: 'Achievement deleted successfully' });
-});
-
-// Gallery CRUD
-apiRouter.post('/gallery', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'gallery');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, category, image_url, caption_en, caption_np } = req.body;
-  const gallery = [...(db.getState().gallery || [])];
-  const newItem = {
-    id: Date.now(),
-    title_en: title_en || 'Campus Activity',
-    title_np: title_np || title_en || 'विद्यालय गतिविधि',
-    category: category || 'campus',
-    url: image_url || req.body.url || '',
-    caption_en: caption_en || '',
-    caption_np: caption_np || ''
-  };
-  gallery.unshift(newItem);
-  await db.updateModule('gallery', gallery, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-
-apiRouter.put('/gallery/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'gallery');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const gallery = [...(db.getState().gallery || [])];
-  const idx = gallery.findIndex((g: any) => String(g.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Gallery item not found' });
-  }
-  gallery[idx] = { ...gallery[idx], ...req.body };
-  await db.updateModule('gallery', gallery, `@${session.username}`);
-  res.json({ success: true, data: gallery[idx] });
-});
-
-apiRouter.delete('/gallery/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'gallery');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let gallery = [...(db.getState().gallery || [])];
-  const prevCount = gallery.length;
-  gallery = gallery.filter((g: any) => String(g.id) !== String(req.params.id));
-  if (gallery.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Gallery item not found' });
-  }
-  await db.updateModule('gallery', gallery, `@${session.username}`);
-  res.json({ success: true, message: 'Gallery item deleted successfully' });
-});
-
-// History Milestones CRUD
-apiRouter.post('/history', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'history');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { year_bs, year_ad, title_en, title_np, description_en, description_np, event_en, event_np, image, status } = req.body;
-  const history = [...(db.getState().history || [])];
-  const newItem: HistoryItem = {
-    id: Date.now(),
-    year: String(year_bs || year_ad || '२०३५'),
-    title_en: title_en || event_en || 'Historical Milestone',
-    title_np: title_np || event_np || title_en || 'ऐतिहासिक उपलब्धि',
-    desc_en: description_en || '',
-    desc_np: description_np || '',
-    image: image || '',
-    status: (status as any) || 'published',
-    is_enabled: true
-  };
-  history.push(newItem);
-  await db.updateModule('history', history, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-
-apiRouter.put('/history/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'history');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const history = [...(db.getState().history || [])];
-  const idx = history.findIndex((h: any) => String(h.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'History item not found' });
-  }
-  history[idx] = { ...history[idx], ...req.body };
-  await db.updateModule('history', history, `@${session.username}`);
-  res.json({ success: true, data: history[idx] });
-});
-
-apiRouter.delete('/history/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'history');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let history = [...(db.getState().history || [])];
-  const prevCount = history.length;
-  history = history.filter((h: any) => String(h.id) !== String(req.params.id));
-  if (history.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'History item not found' });
-  }
-  await db.updateModule('history', history, `@${session.username}`);
-  res.json({ success: true, message: 'History item deleted successfully' });
-});
-
-// Curriculum Guidelines CRUD
-apiRouter.post('/curriculum', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'curriculumGuidelines');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, subject, class_level, file_url, original_filename, file_size_mb, status, description_en, description_np } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'Curriculum guideline title is required' });
-  }
-  const currList = [...(db.getState().curriculumGuidelines || [])];
-  const newItem: CurriculumGuideline = {
-    id: `curr-${Date.now()}`,
-    title_en,
-    title_np: title_np || title_en,
-    subject: subject || 'General',
-    class_level: class_level || 'Grade 10',
-    academic_level_id: class_level ? String(class_level).toLowerCase().replace(/\s+/g, '-') : 'secondary',
-    file_url: file_url || '',
-    pdf_path: file_url || '',
-    original_filename: original_filename || '',
-    file_size_bytes: (Number(file_size_mb) || 1) * 1024 * 1024,
-    file_size_formatted: `${file_size_mb || 1} MB`,
-    mime_type: 'application/pdf',
-    status: status === 'draft' ? 'unpublished' : 'published',
-    description_en: description_en || '',
-    description_np: description_np || '',
-    display_order: currList.length + 1,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-  currList.push(newItem);
-  await db.updateModule('curriculumGuidelines', currList, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-
-apiRouter.put('/curriculum/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'curriculumGuidelines');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const currList = [...(db.getState().curriculumGuidelines || [])];
-  const idx = currList.findIndex((c: any) => String(c.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Curriculum guideline not found' });
-  }
-  currList[idx] = { ...currList[idx], ...req.body, updated_at: new Date().toISOString() };
-  await db.updateModule('curriculumGuidelines', currList, `@${session.username}`);
-  res.json({ success: true, data: currList[idx] });
-});
-
-apiRouter.delete('/curriculum/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'curriculumGuidelines');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let currList = [...(db.getState().curriculumGuidelines || [])];
-  const prevCount = currList.length;
-  currList = currList.filter((c: any) => String(c.id) !== String(req.params.id));
-  if (currList.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Curriculum guideline not found' });
-  }
-  await db.updateModule('curriculumGuidelines', currList, `@${session.username}`);
-  res.json({ success: true, message: 'Curriculum guideline deleted successfully' });
-});
-
-// About Sections CRUD
-apiRouter.get('/about', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().aboutSections || [] });
-});
-
-apiRouter.post('/about', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'aboutSections');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, category, content_en, content_np, image, icon } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: 'About section title is required' });
-  }
-  const aboutList = [...(db.getState().aboutSections || [])];
-  const newSection = {
-    id: `about-${Date.now()}`,
-    title_en,
-    title_np: title_np || title_en,
-    category: category || 'overview',
-    content_en: content_en || '',
-    content_np: content_np || '',
-    image: image || '',
-    icon: icon || 'Compass',
-    display_order: aboutList.length + 1,
-    status: 'published' as const,
-    is_enabled: true
-  };
-  aboutList.push(newSection);
-  await db.updateModule('aboutSections', aboutList, `@${session.username}`);
-  res.status(201).json({ success: true, data: newSection });
-});
-
-apiRouter.put('/about/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'aboutSections');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const aboutList = [...(db.getState().aboutSections || [])];
-  const idx = aboutList.findIndex((a: any) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'About section not found' });
-  }
-  aboutList[idx] = { ...aboutList[idx], ...req.body };
-  await db.updateModule('aboutSections', aboutList, `@${session.username}`);
-  res.json({ success: true, data: aboutList[idx] });
-});
-
-apiRouter.delete('/about/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'aboutSections');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let aboutList = [...(db.getState().aboutSections || [])];
-  const prevCount = aboutList.length;
-  aboutList = aboutList.filter((a: any) => String(a.id) !== String(req.params.id));
-  if (aboutList.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'About section not found' });
-  }
-  await db.updateModule('aboutSections', aboutList, `@${session.username}`);
-  res.json({ success: true, message: 'About section deleted successfully' });
-});
-
-// Vacancies CRUD
-apiRouter.get('/vacancies', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().vacancies || [] });
-});
-
-apiRouter.post('/vacancies', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'vacancies');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const { title_en, title_np, position_en, position_np, subject, count, deadline_en, deadline_np, qualifications_en, qualifications_np, description_en, description_np, pdf_url } = req.body;
-  if (!title_en && !position_en) {
-    return res.status(400).json({ success: false, error: 'Vacancy position or title is required' });
-  }
-  const vacancies = [...(db.getState().vacancies || [])];
-  const newVac: Vacancy = {
-    id: `vac-${Date.now()}`,
-    title_en: title_en || position_en || 'Teacher Vacancy',
-    title_np: title_np || position_np || title_en || position_en || 'शिक्षक आवश्यकता',
-    department: subject || 'Academic',
-    employment_type: 'full_time',
-    positions_count: Number(count) || 1,
-    short_description_en: (description_en || qualifications_en || '').slice(0, 150),
-    description_en: description_en || qualifications_en || 'Vacancy details available in attachment',
-    description_np: description_np || qualifications_np || '',
-    qualifications: qualifications_en ? [qualifications_en] : [],
-    application_method: 'in_person',
-    application_deadline: deadline_en || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-    apply_now_enabled: true,
-    pdf_url: pdf_url || '',
-    ...(req.body as any)
-  };
-  vacancies.unshift(newVac);
-  await db.updateModule('vacancies', vacancies, `@${session.username}`);
-  res.status(201).json({ success: true, data: newVac });
-});
-
-apiRouter.put('/vacancies/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'vacancies');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  const vacancies = [...(db.getState().vacancies || [])];
-  const idx = vacancies.findIndex((v: any) => String(v.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Vacancy not found' });
-  }
-  vacancies[idx] = { ...vacancies[idx], ...req.body };
-  await db.updateModule('vacancies', vacancies, `@${session.username}`);
-  res.json({ success: true, data: vacancies[idx] });
-});
-
-apiRouter.delete('/vacancies/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'vacancies');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  let vacancies = [...(db.getState().vacancies || [])];
-  const prevCount = vacancies.length;
-  vacancies = vacancies.filter((v: any) => String(v.id) !== String(req.params.id));
-  if (vacancies.length === prevCount) {
-    return res.status(404).json({ success: false, error: 'Vacancy not found' });
-  }
-  await db.updateModule('vacancies', vacancies, `@${session.username}`);
-  res.json({ success: true, message: 'Vacancy deleted successfully' });
-});
-
-// Admin Accounts CRUD (Strict Super Admin Only)
-apiRouter.get('/admin/accounts', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  if (session.role !== 'super_admin') {
-    return res.status(403).json({ success: false, error: 'Super Admin privilege required' });
-  }
-  await db.ensureLoaded();
-  const accounts = db.getState().adminAccounts.map((a) => ({
-    ...a,
-    passwordHash: '[PROTECTED_BCRYPT_HASH]'
-  }));
-  res.json({ success: true, data: accounts });
-});
-
-apiRouter.post('/admin/accounts', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  if (session.role !== 'super_admin') {
-    return res.status(403).json({ success: false, error: 'Super Admin privilege required to create accounts' });
-  }
-  const { username, fullName, email, role, permissions, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ success: false, error: 'Username and initial password are required' });
-  }
-  const accounts = [...db.getState().adminAccounts];
-  if (accounts.some((a) => a.username.toLowerCase() === String(username).toLowerCase().trim())) {
-    return res.status(400).json({ success: false, error: 'Username already in use' });
-  }
-  const newAccount: AdminAccount = {
-    id: `acc-${Date.now()}`,
-    username: String(username).trim().toLowerCase(),
-    fullName: fullName || username,
-    email: email || '',
-    role: role === 'super_admin' ? 'super_admin' : 'admin',
-    permissions: role === 'super_admin' ? ALL_PERMISSIONS.map((p) => p.key) : permissions || [],
-    passwordHash: hashPasswordBcrypt(password),
-    salt: '',
-    status: 'active',
-    isActive: true,
-    createdAt: new Date().toISOString()
-  };
-  accounts.push(newAccount);
-  await db.updateModule('adminAccounts', accounts, `@${session.username}`);
-  res.status(201).json({
-    success: true,
-    data: { ...newAccount, passwordHash: '[PROTECTED_BCRYPT_HASH]' }
-  });
-});
-
-apiRouter.put('/admin/accounts/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  if (session.role !== 'super_admin') {
-    return res.status(403).json({ success: false, error: 'Super Admin privilege required to update accounts' });
-  }
-  const accounts = [...db.getState().adminAccounts];
-  const idx = accounts.findIndex((a) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: 'Account not found' });
-  }
-  const updated = { ...accounts[idx], ...req.body };
-  if (req.body.password) {
-    updated.passwordHash = hashPasswordBcrypt(req.body.password);
-  }
-  accounts[idx] = updated;
-  await db.updateModule('adminAccounts', accounts, `@${session.username}`);
-  res.json({
-    success: true,
-    data: { ...updated, passwordHash: '[PROTECTED_BCRYPT_HASH]' }
-  });
-});
-
-apiRouter.delete('/admin/accounts/:id', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  if (session.role !== 'super_admin') {
-    return res.status(403).json({ success: false, error: 'Super Admin privilege required to delete accounts' });
-  }
-  let accounts = [...db.getState().adminAccounts];
-  const target = accounts.find((a) => String(a.id) === String(req.params.id));
-  if (!target) {
-    return res.status(404).json({ success: false, error: 'Account not found' });
-  }
-  if (target.id === session.userId) {
-    return res.status(400).json({ success: false, error: 'Cannot delete your own active administrator account' });
-  }
-  accounts = accounts.filter((a) => String(a.id) !== String(req.params.id));
-  await db.updateModule('adminAccounts', accounts, `@${session.username}`);
-  res.json({ success: true, message: 'Administrator account deleted successfully' });
-});
-
-apiRouter.get('/admin/audit-logs', requireAuth, async (req: Request, res: Response) => {
-  const session: ServerSession = (req as any).session;
-  const permCheck = db.checkPermission(session, 'auditLogs');
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || 'Forbidden' });
-  }
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().auditLogs || [] });
 });
 
 // 4. Real-time Synchronization Stream (Server-Sent Events)
@@ -1176,7 +360,6 @@ apiRouter.get('/weather', async (req: Request, res: Response) => {
 
 // 5. Admin Authentication (Normal Password & Master Key)
 export const handleAdminLogin = async (req: Request, res: Response) => {
-  await db.ensureLoaded();
   const { username, password, loginType, masterKey } = req.body;
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
   const userAgent = req.headers['user-agent'] || 'Unknown Browser';
@@ -1348,15 +531,13 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
     const session = db.createSession(matchingAccount, clientIp, userAgent);
 
     // Set secure HttpOnly cookie for same-origin session
-    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 60;
+    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 30;
     const isProduction = process.env.NODE_ENV === 'production';
-    const isSecure = isProduction || isServerlessEnvironment || Boolean(req.headers['x-forwarded-proto'] === 'https') || req.secure;
     res.cookie('ishwari_session', session.token, {
       httpOnly: true,
-      secure: isSecure,
+      secure: isProduction,
       sameSite: 'lax',
-      path: '/',
-      maxAge: Math.max(timeoutMinutes, 60) * 60 * 1000
+      maxAge: timeoutMinutes * 60 * 1000
     });
 
     await db.appendAuditLog({
@@ -1392,8 +573,7 @@ apiRouter.post('/auth/login', handleAdminLogin);
 apiRouter.post('/login', handleAdminLogin);
 
 // 6. Current Session Validation Endpoint
-apiRouter.get('/auth/me', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.get('/auth/me', (req: Request, res: Response) => {
   const token = extractToken(req);
   const session = db.validateSession(token);
 
@@ -1428,8 +608,7 @@ apiRouter.get('/auth/me', async (req: Request, res: Response) => {
 });
 
 // 7. Secure Logout & Invalidation
-apiRouter.post('/auth/logout', async (req: Request, res: Response) => {
-  await db.ensureLoaded();
+apiRouter.post('/auth/logout', (req: Request, res: Response) => {
   const token = extractToken(req);
   const session = db.validateSession(token);
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
@@ -1449,12 +628,10 @@ apiRouter.post('/auth/logout', async (req: Request, res: Response) => {
   }
 
   const isProduction = process.env.NODE_ENV === 'production';
-  const isSecure = isProduction || isServerlessEnvironment || Boolean(req.headers['x-forwarded-proto'] === 'https') || req.secure;
   res.clearCookie('ishwari_session', {
     httpOnly: true,
-    secure: isSecure,
-    sameSite: 'lax',
-    path: '/'
+    secure: isProduction,
+    sameSite: 'lax'
   });
   res.json({ success: true, message: 'Logged out successfully' });
 });
@@ -1532,8 +709,6 @@ apiRouter.post('/cms/sync', requireAuth, async (req: Request, res: Response) => 
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
   const effectiveActor = actor || `@${session.username} (${session.role})`;
 
-  const clientVer = Number(req.headers['x-cms-client-version']) || undefined;
-
   try {
     if (batch && typeof batch === 'object') {
       // Check permissions for every module in batch
@@ -1559,7 +734,7 @@ apiRouter.post('/cms/sync', requireAuth, async (req: Request, res: Response) => 
         }
       }
 
-      const result = await db.updateBatch(batch, effectiveActor, clientIp, clientVer);
+      const result = await db.updateBatch(batch, effectiveActor, clientIp);
       res.json({ success: true, ...result });
       return;
     }
@@ -1829,7 +1004,7 @@ apiRouter.post('/cms/sync', requireAuth, async (req: Request, res: Response) => 
       }
     }
 
-    const result = await db.updateModule(module, data, effectiveActor, clientIp, clientVer);
+    const result = await db.updateModule(module, data, effectiveActor, clientIp);
     res.json({ success: true, ...result });
   } catch (err: any) {
     console.error('Error during CMS sync:', err);
@@ -1895,7 +1070,7 @@ apiRouter.post('/contact/submit', async (req: Request, res: Response) => {
 });
 
 // 11. Secure File Upload Validator (Images & PDF documents)
-apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) => {
+apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
   const { fileName, fileType, base64Data, category } = req.body;
 
   if (!base64Data || !fileName) {
@@ -1926,13 +1101,12 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
       return;
     }
 
-    // Persist file in dedicated backend uploads folder and durable Firestore object store
+    // Persist file in dedicated backend uploads folder
     const currUploadDir = getBackendUploadDir('curriculum');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `curr-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
     const filePath = path.join(currUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, 'curriculum', 'application/pdf', base64Data, sizeInBytes);
 
     const formattedSize = sizeInBytes < 1024 * 1024
       ? `${Math.round(sizeInBytes / 1024)} KB`
@@ -1965,13 +1139,12 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
       return;
     }
 
-    // Persist file in dedicated backend uploads folder and durable Firestore object store
+    // Persist file in dedicated backend uploads folder backend/uploads/vacancies
     const vacUploadDir = getBackendUploadDir('vacancies');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `vac-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
     const filePath = path.join(vacUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, 'vacancies', 'application/pdf', base64Data, sizeInBytes);
 
     const formattedSize = sizeInBytes < 1024 * 1024
       ? `${Math.round(sizeInBytes / 1024)} KB`
@@ -2003,23 +1176,6 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
       res.status(400).json({ success: false, error: 'Invalid file signature. File is not a valid PDF document.' });
       return;
     }
-
-    const docUploadDir = getBackendUploadDir('documents');
-    const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const uniqueFileName = `doc-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
-    const filePath = path.join(docUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, 'documents', 'application/pdf', base64Data, sizeInBytes);
-
-    res.json({
-      success: true,
-      url: `/api/document/file/${uniqueFileName}`,
-      fileName: fileName,
-      uniqueFileName,
-      size: sizeInBytes,
-      base64Data: base64Data
-    });
-    return;
   } else if (category === 'about_image' || category === 'about') {
     // About page inline & section media: PNG, JPG, JPEG, GIF, Max 1 MB (1024 * 1024 bytes)
     const ext = path.extname(fileName).toLowerCase();
@@ -2051,15 +1207,13 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
     }
 
     const mediaType: 'gif' | 'image' = isGif ? 'gif' : 'image';
-    const mimeType = isGif ? 'image/gif' : isPng ? 'image/png' : 'image/jpeg';
 
-    // Persist file in dedicated backend uploads folder and durable Firestore object store
+    // Persist file in dedicated backend uploads folder backend/uploads/about
     const aboutUploadDir = getBackendUploadDir('about');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `about-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
     const filePath = path.join(aboutUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, 'about', mimeType, base64Data, sizeInBytes);
 
     res.json({
       success: true,
@@ -2102,15 +1256,13 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
     }
 
     const mediaType: 'gif' | 'image' = isGif ? 'gif' : 'image';
-    const mimeType = isGif ? 'image/gif' : isPng ? 'image/png' : 'image/jpeg';
 
-    // Persist file in dedicated backend uploads folder and durable Firestore object store
+    // Persist file in dedicated backend uploads folder backend/uploads/history
     const historyUploadDir = getBackendUploadDir('history');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `history-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
     const filePath = path.join(historyUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, 'history', mimeType, base64Data, sizeInBytes);
 
     res.json({
       success: true,
@@ -2208,7 +1360,7 @@ apiRouter.get('/curriculum', (req: Request, res: Response) => {
 });
 
 // 13. Serve Curriculum PDF Files with Security Headers and Path Traversal Protection
-apiRouter.get('/curriculum/file/:filename', async (req: Request, res: Response) => {
+apiRouter.get('/curriculum/file/:filename', (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
 
   // Validate filename strictly against traversal attacks
@@ -2217,57 +1369,18 @@ apiRouter.get('/curriculum/file/:filename', async (req: Request, res: Response) 
     return;
   }
 
-  const download = req.query.download === '1' || req.query.download === 'true';
-  const originalName = req.query.name ? String(req.query.name) : filename;
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader(
-    'Content-Disposition',
-    `${download ? 'attachment' : 'inline'}; filename="${encodeURIComponent(originalName)}"`
-  );
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-
   const filePath = resolveUploadFilePath('curriculum', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath);
-    res.setHeader('Content-Length', stat.size);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: 'Curriculum PDF resource not found on server' });
     return;
   }
 
-  // Fallback to durable object storage in Firestore
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(',');
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, 'base64');
-    res.setHeader('Content-Length', fileBuf.length);
-    try {
-      const localDir = getBackendUploadDir('curriculum');
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {}
-    res.send(fileBuf);
-    return;
-  }
-
-  res.status(404).json({ success: false, error: 'Curriculum PDF resource not found on server' });
-});
-
-// 13b. Serve Document PDF Files with Security Headers
-apiRouter.get('/document/file/:filename', async (req: Request, res: Response) => {
-  const filename = path.basename(req.params.filename);
-
-  if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
-    res.status(400).json({ success: false, error: 'Invalid file identifier' });
-    return;
-  }
-
+  const stat = fs.statSync(filePath);
   const download = req.query.download === '1' || req.query.download === 'true';
   const originalName = req.query.name ? String(req.query.name) : filename;
 
   res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', stat.size);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader(
     'Content-Disposition',
@@ -2275,30 +1388,8 @@ apiRouter.get('/document/file/:filename', async (req: Request, res: Response) =>
   );
   res.setHeader('Cache-Control', 'public, max-age=3600');
 
-  const filePath = resolveUploadFilePath('documents', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath);
-    res.setHeader('Content-Length', stat.size);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-    return;
-  }
-
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(',');
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, 'base64');
-    res.setHeader('Content-Length', fileBuf.length);
-    try {
-      const localDir = getBackendUploadDir('documents');
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {}
-    res.send(fileBuf);
-    return;
-  }
-
-  res.status(404).json({ success: false, error: 'Document PDF resource not found on server' });
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 });
 
 // 14. History Milestones API
@@ -2328,150 +1419,117 @@ apiRouter.get('/history', (req: Request, res: Response) => {
 });
 
 // 15. Serve About Page Media (Images & GIFs) with Security Headers and Path Traversal Protection
-apiRouter.get('/about/file/:filename', async (req: Request, res: Response) => {
+apiRouter.get('/about/file/:filename', (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
+    return;
+  }
+  const filePath = resolveUploadFilePath('about', filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: 'About media resource not found' });
     return;
   }
   const ext = path.extname(filename).toLowerCase();
   const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-
-  const filePath = resolveUploadFilePath('about', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(',');
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, 'base64');
-    try {
-      const localDir = getBackendUploadDir('about');
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {}
-    res.send(fileBuf);
-    return;
-  }
-
-  res.status(404).json({ success: false, error: 'About media resource not found' });
+  res.sendFile(filePath);
 });
 
-apiRouter.delete('/about/file/:filename', requireAuth, async (req: Request, res: Response) => {
+apiRouter.delete('/about/file/:filename', requireAuth, (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath('about', filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {}
+      res.json({ success: true, message: 'Media file deleted successfully' });
+      return;
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: 'Failed to delete file' });
+      return;
+    }
   }
-  res.json({ success: true, message: 'Media file deleted successfully' });
+  res.json({ success: true, message: 'File does not exist or already removed' });
 });
 
 // 16. Serve School History Page Media (Images & GIFs) with Security Headers and Path Traversal Protection
-apiRouter.get('/history/file/:filename', async (req: Request, res: Response) => {
+apiRouter.get('/history/file/:filename', (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
+    return;
+  }
+  const filePath = resolveUploadFilePath('history', filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: 'History media resource not found' });
     return;
   }
   const ext = path.extname(filename).toLowerCase();
   const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-
-  const filePath = resolveUploadFilePath('history', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(',');
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, 'base64');
-    try {
-      const localDir = getBackendUploadDir('history');
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {}
-    res.send(fileBuf);
-    return;
-  }
-
-  res.status(404).json({ success: false, error: 'History media resource not found' });
+  res.sendFile(filePath);
 });
 
-apiRouter.delete('/history/file/:filename', requireAuth, async (req: Request, res: Response) => {
+apiRouter.delete('/history/file/:filename', requireAuth, (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath('history', filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {}
+      res.json({ success: true, message: 'History media file deleted successfully' });
+      return;
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: 'Failed to delete file' });
+      return;
+    }
   }
-  res.json({ success: true, message: 'History media file deleted successfully' });
+  res.json({ success: true, message: 'File does not exist or already removed' });
 });
 
 // 17. Serve Vacancy / Career PDF Documents with Security Headers and Path Traversal Protection
-apiRouter.get('/vacancy/file/:filename', async (req: Request, res: Response) => {
+apiRouter.get('/vacancy/file/:filename', (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
+    return;
+  }
+  const filePath = resolveUploadFilePath('vacancies', filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: 'Vacancy document not found' });
     return;
   }
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
   res.setHeader('Cache-Control', 'public, max-age=86400');
-
-  const filePath = resolveUploadFilePath('vacancies', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(',');
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, 'base64');
-    try {
-      const localDir = getBackendUploadDir('vacancies');
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {}
-    res.send(fileBuf);
-    return;
-  }
-
-  res.status(404).json({ success: false, error: 'Vacancy document not found' });
+  res.sendFile(filePath);
 });
 
-apiRouter.delete('/vacancy/file/:filename', requireAuth, async (req: Request, res: Response) => {
+apiRouter.delete('/vacancy/file/:filename', requireAuth, (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath('vacancies', filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {}
+      res.json({ success: true, message: 'Vacancy PDF deleted successfully' });
+      return;
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: 'Failed to delete file' });
+      return;
+    }
   }
-  res.json({ success: true, message: 'Vacancy PDF deleted successfully' });
+  res.json({ success: true, message: 'File does not exist or already removed' });
 });

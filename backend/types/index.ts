@@ -442,6 +442,7 @@ export type PermissionKey =
   | 'submenu.content_events'
   | 'submenu.content_achievements'
   | 'submenu.content_history'
+  | 'submenu.content_faq'
   // Governance Submenus
   | 'submenu.gov_chairman'
   | 'submenu.gov_principal'

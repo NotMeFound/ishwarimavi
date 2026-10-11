@@ -7,7 +7,6 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import fs from "fs";
 import path from "path";
-import os from "os";
 import crypto3 from "crypto";
 
 // backend/db.ts
@@ -1597,6 +1596,17 @@ var MAIN_MENU_HIERARCHY = [
           { key: "history.update", labelEn: "Edit Milestone", labelNp: "\u0915\u094B\u0938\u0947\u0922\u0941\u0919\u094D\u0917\u093E \u0938\u092E\u094D\u092A\u093E\u0926\u0928", descEn: "Can update historical milestone details" },
           { key: "history.delete", labelEn: "Delete Milestone", labelNp: "\u0915\u094B\u0938\u0947\u0922\u0941\u0919\u094D\u0917\u093E \u092E\u0947\u091F\u093E\u0909\u0928\u0941\u0939\u094B\u0938\u094D", descEn: "Can delete history records" }
         ]
+      },
+      {
+        key: "submenu.content_faq",
+        tabId: "content_faq",
+        labelEn: "FAQs & Q&A",
+        labelNp: "\u092A\u094D\u0930\u093E\u092F\u0903 \u0938\u094B\u0927\u093F\u0928\u0947 \u092A\u094D\u0930\u0936\u094D\u0928\u0939\u0930\u0942 (FAQ)",
+        descEn: "Public Q&A, admissions guidance, and common school information",
+        actions: [
+          { key: "about.view", labelEn: "View FAQs", labelNp: "FAQ \u0939\u0947\u0930\u094D\u0928\u0941\u0939\u094B\u0938\u094D", descEn: "Can view published FAQs" },
+          { key: "about.update", labelEn: "Manage FAQs", labelNp: "FAQ \u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093E\u092A\u0928", descEn: "Can add, edit, and publish FAQs" }
+        ]
       }
     ]
   },
@@ -2741,9 +2751,6 @@ var db = new CMSDatabaseManager();
 
 // backend/routes.ts
 var apiRouter = express.Router();
-var isServerlessEnvironment = Boolean(
-  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT
-);
 function createSamplePdf(title, grade) {
   const content = `BT /F1 18 Tf 50 720 Td (${title.replace(/[\(\)]/g, "")}) Tj ET BT /F1 13 Tf 50 690 Td (Ishwari Secondary School - Curriculum Resource - ${grade.replace(/[\(\)]/g, "")}) Tj ET BT /F1 10 Tf 50 640 Td (1. Competencies and Learning Outcomes Framework) Tj ET BT /F1 9 Tf 50 610 Td (This official curriculum document specifies national competencies, pedagogical directives,) Tj ET BT /F1 9 Tf 50 595 Td (practical experimentation steps, internal assessment rubrics, and terminal SEE/NEB guidelines.) Tj ET BT /F1 9 Tf 50 560 Td (Curriculum Development Centre (CDC) & National Examinations Board (NEB) Prescribed Framework.) Tj ET BT /F1 9 Tf 50 530 Td (Ishwari Secondary School, Educational Planning & Evaluation Committee - 2083 B.S.) Tj ET`;
   const streamLength = Buffer.byteLength(content, "utf8");
@@ -2783,20 +2790,17 @@ startxref
   return Buffer.from(pdfStr, "utf8");
 }
 function getBackendUploadDir(category) {
-  const baseDir = isServerlessEnvironment ? path.join(os.tmpdir(), "ishwari_uploads") : path.join(process.cwd(), "backend", "uploads");
-  const targetDir = path.join(baseDir, category);
-  if (!fs.existsSync(targetDir)) {
+  const backendDir = path.join(process.cwd(), "backend", "uploads", category);
+  if (!fs.existsSync(backendDir)) {
     try {
-      fs.mkdirSync(targetDir, { recursive: true });
+      fs.mkdirSync(backendDir, { recursive: true });
     } catch (e) {
-      console.warn("Could not create backend upload directory:", targetDir, e);
+      console.warn("Could not create backend upload directory:", backendDir, e);
     }
   }
-  return targetDir;
+  return backendDir;
 }
 function resolveUploadFilePath(category, filename) {
-  const pTmp = path.join(os.tmpdir(), "ishwari_uploads", category, filename);
-  if (fs.existsSync(pTmp)) return pTmp;
   const pBackend = path.join(process.cwd(), "backend", "uploads", category, filename);
   if (fs.existsSync(pBackend)) return pBackend;
   const pData = path.join(process.cwd(), "data", "uploads", category, filename);
@@ -2839,54 +2843,34 @@ function extractToken(req) {
   if (cookieToken) return cookieToken;
   return void 0;
 }
-async function requireAuth(req, res, next) {
-  try {
-    await db.ensureLoaded();
-    const token = extractToken(req);
-    const session = db.validateSession(token);
-    if (!session) {
-      res.status(401).json({
-        success: false,
-        error: "Authentication session expired or invalid. Please log in to proceed."
-      });
-      return;
-    }
-    req.session = session;
-    next();
-  } catch (err) {
-    res.status(500).json({ success: false, error: "Database session validation error" });
+function requireAuth(req, res, next) {
+  const token = extractToken(req);
+  const session = db.validateSession(token);
+  if (!session) {
+    res.status(401).json({
+      success: false,
+      error: "Authentication session expired or invalid. Please log in to proceed."
+    });
+    return;
   }
+  req.session = session;
+  next();
 }
-apiRouter.get("/health", async (req, res) => {
-  const requestId = req.requestId || req.headers["x-request-id"] || "req_health";
-  const dbHealth = await db.checkDatabaseHealth();
+apiRouter.get("/health", (req, res) => {
   const versionInfo = db.getVersion();
-  const overallStatus = dbHealth.status === "healthy" ? "healthy" : dbHealth.status === "degraded" ? "degraded" : "unavailable";
-  const statusCode = overallStatus === "healthy" ? 200 : overallStatus === "degraded" ? 200 : 503;
-  res.status(statusCode).json({
-    success: overallStatus !== "unavailable",
-    status: overallStatus,
-    requestId,
-    runtime: {
-      uptimeSeconds: Math.floor(process.uptime()),
-      nodeVersion: process.version,
-      memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
-    },
-    database: {
-      status: dbHealth.status,
-      latencyMs: dbHealth.latencyMs,
-      version: versionInfo.version,
-      lastModified: versionInfo.lastModified,
-      ...dbHealth.errorCategory ? { errorCategory: dbHealth.errorCategory } : {}
-    },
+  res.json({
+    success: true,
+    status: "ok",
+    version: versionInfo.version,
+    lastModified: versionInfo.lastModified,
+    uptime: process.uptime(),
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-apiRouter.get("/cms/state", async (req, res) => {
+apiRouter.get("/cms/state", (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
-  await db.ensureLoaded();
   const token = extractToken(req);
   const session = db.validateSession(token);
   const state = db.getState();
@@ -2934,10 +2918,9 @@ apiRouter.get("/cms/state", async (req, res) => {
     data: publicData
   });
 });
-apiRouter.get("/cms/version", async (req, res) => {
+apiRouter.get("/cms/version", (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
-  await db.ensureLoaded();
   const versionInfo = db.getVersion();
   res.json({
     success: true,
@@ -2945,749 +2928,32 @@ apiRouter.get("/cms/version", async (req, res) => {
     lastModified: versionInfo.lastModified
   });
 });
-apiRouter.get("/notices", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/notices", (req, res) => {
   res.json({ success: true, data: db.getState().notices || [] });
 });
-apiRouter.post("/notices", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "notices");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, category, description_en, description_np, is_pinned, is_published, file_name, file_url } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "Notice title in English is required" });
-  }
-  const notices = [...db.getState().notices || []];
-  const todayIso = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-  const newNotice = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    date_en: todayIso,
-    date_np: "\u0968\u0966\u096E\u0969",
-    category: category || "academic",
-    pinned: Boolean(is_pinned),
-    is_pinned: Boolean(is_pinned),
-    published: is_published !== false,
-    is_published: is_published !== false,
-    status: is_published !== false ? "published" : "draft",
-    file_name: file_name || "",
-    file_data: file_url || "",
-    description_en: description_en || "",
-    description_np: description_np || "",
-    updated_at: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  notices.unshift(newNotice);
-  await db.updateModule("notices", notices, `@${session.username}`);
-  res.status(201).json({ success: true, data: newNotice });
-});
-apiRouter.put("/notices/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "notices");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const notices = [...db.getState().notices || []];
-  const idx = notices.findIndex((n) => String(n.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Notice not found" });
-  }
-  notices[idx] = { ...notices[idx], ...req.body, updated_at: (/* @__PURE__ */ new Date()).toISOString() };
-  await db.updateModule("notices", notices, `@${session.username}`);
-  res.json({ success: true, data: notices[idx] });
-});
-apiRouter.delete("/notices/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "notices");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let notices = [...db.getState().notices || []];
-  const prevCount = notices.length;
-  notices = notices.filter((n) => String(n.id) !== String(req.params.id));
-  if (notices.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Notice not found" });
-  }
-  await db.updateModule("notices", notices, `@${session.username}`);
-  res.json({ success: true, message: "Notice deleted successfully" });
-});
-apiRouter.get("/documents", async (req, res) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().documents || [] });
-});
-apiRouter.post("/documents", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "documents");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, category, file_name, file_url, file_size_kb } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "Document title is required" });
-  }
-  if (file_name && !file_name.toLowerCase().endsWith(".pdf")) {
-    return res.status(400).json({ success: false, error: "Documents must be in PDF format only" });
-  }
-  if (file_size_kb && file_size_kb > 200) {
-    return res.status(400).json({ success: false, error: "Document size exceeds 200 KB limit" });
-  }
-  const documents = [...db.getState().documents || []];
-  const newDoc = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    type: "PDF",
-    size: file_size_kb ? `${file_size_kb} KB` : "100 KB",
-    date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    category: category || "general",
-    file_name: file_name || "",
-    file_data: file_url || "",
-    file_size_kb: file_size_kb || 0,
-    status: "published"
-  };
-  documents.unshift(newDoc);
-  await db.updateModule("documents", documents, `@${session.username}`);
-  res.status(201).json({ success: true, data: newDoc });
-});
-apiRouter.delete("/documents/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "documents");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let docs = [...db.getState().documents || []];
-  const prevCount = docs.length;
-  docs = docs.filter((d) => String(d.id) !== String(req.params.id));
-  if (docs.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Document not found" });
-  }
-  await db.updateModule("documents", docs, `@${session.username}`);
-  res.json({ success: true, message: "Document deleted successfully" });
-});
-apiRouter.get("/site-settings", async (req, res) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: { school: db.getState().school, siteConfig: db.getState().siteConfig } });
-});
-apiRouter.put("/site-settings", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "siteConfig");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const batch = {};
-  if (req.body.school) batch.school = { ...db.getState().school, ...req.body.school };
-  if (req.body.siteConfig) batch.siteConfig = { ...db.getState().siteConfig, ...req.body.siteConfig };
-  await db.updateBatch(batch, `@${session.username}`);
-  res.json({ success: true, message: "Site settings updated successfully" });
-});
-apiRouter.get("/gallery", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/gallery", (req, res) => {
   res.json({ success: true, data: db.getState().gallery || [] });
 });
-apiRouter.get("/teachers", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/teachers", (req, res) => {
   res.json({ success: true, data: db.getState().staff || [] });
 });
-apiRouter.get("/staff", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/staff", (req, res) => {
   res.json({ success: true, data: db.getState().staff || [] });
 });
-apiRouter.get("/programs", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/programs", (req, res) => {
   res.json({ success: true, data: db.getState().programs || [] });
 });
 apiRouter.get("/alumni", (req, res) => {
   res.json({ success: true, data: [] });
 });
-apiRouter.get("/faqs", async (req, res) => {
-  await db.ensureLoaded();
-  const publicData = db.getPublicState();
-  res.json({ success: true, data: publicData.faqs || [] });
+apiRouter.get("/faqs", (req, res) => {
+  res.json({ success: true, data: db.getState().faqs || [] });
 });
-apiRouter.get("/events", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/events", (req, res) => {
   res.json({ success: true, data: db.getState().events || [] });
 });
-apiRouter.get("/facilities", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/facilities", (req, res) => {
   res.json({ success: true, data: db.getState().facilities || [] });
-});
-apiRouter.post("/staff", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "staff");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { name_en, name_np, designation_en, designation_np, role_type, category, phone, email, qualification_en, image, bio_en, bio_np, display_order } = req.body;
-  if (!name_en) {
-    return res.status(400).json({ success: false, error: "Staff name in English is required" });
-  }
-  const staff = [...db.getState().staff || []];
-  const newMember = {
-    id: Date.now(),
-    name_en,
-    name_np: name_np || name_en,
-    role: role_type || "teacher",
-    designation_en: designation_en || "Faculty Member",
-    designation_np: designation_np || designation_en || "\u0936\u093F\u0915\u094D\u0937\u0915",
-    experience: req.body.experience || "",
-    contact_phone: phone || "",
-    contact_email: email || "",
-    qualification_en: qualification_en || "",
-    image: image || "",
-    bio_en: bio_en || "",
-    bio_np: bio_np || "",
-    display_order: Number(display_order) || staff.length + 1,
-    isActive: true,
-    published: true
-  };
-  staff.push(newMember);
-  await db.updateModule("staff", staff, `@${session.username}`);
-  res.status(201).json({ success: true, data: newMember });
-});
-apiRouter.put("/staff/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "staff");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const staff = [...db.getState().staff || []];
-  const idx = staff.findIndex((s) => String(s.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Staff member not found" });
-  }
-  staff[idx] = { ...staff[idx], ...req.body };
-  await db.updateModule("staff", staff, `@${session.username}`);
-  res.json({ success: true, data: staff[idx] });
-});
-apiRouter.delete("/staff/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "staff");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let staff = [...db.getState().staff || []];
-  const prevCount = staff.length;
-  staff = staff.filter((s) => String(s.id) !== String(req.params.id));
-  if (staff.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Staff member not found" });
-  }
-  await db.updateModule("staff", staff, `@${session.username}`);
-  res.json({ success: true, message: "Staff member deleted successfully" });
-});
-apiRouter.post("/events", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "events");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, date_en, date_np, time_range, location_en, location_np, description_en, description_np, category, image, is_featured } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "Event title is required" });
-  }
-  const events = [...db.getState().events || []];
-  const newEvent = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    date_en: date_en || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
-    date_np: date_np || "\u0968\u0966\u096E\u0969",
-    time: time_range || "10:00 AM - 4:00 PM",
-    venue_en: location_en || "School Campus",
-    venue_np: location_np || "\u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u092A\u0930\u093F\u0938\u0930",
-    desc_en: description_en || "",
-    desc_np: description_np || "",
-    category: category || "academic",
-    image: image || "",
-    featured: Boolean(is_featured),
-    status: "published"
-  };
-  events.unshift(newEvent);
-  await db.updateModule("events", events, `@${session.username}`);
-  res.status(201).json({ success: true, data: newEvent });
-});
-apiRouter.put("/events/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "events");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const events = [...db.getState().events || []];
-  const idx = events.findIndex((e) => String(e.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Event not found" });
-  }
-  events[idx] = { ...events[idx], ...req.body };
-  await db.updateModule("events", events, `@${session.username}`);
-  res.json({ success: true, data: events[idx] });
-});
-apiRouter.delete("/events/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "events");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let events = [...db.getState().events || []];
-  const prevCount = events.length;
-  events = events.filter((e) => String(e.id) !== String(req.params.id));
-  if (events.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Event not found" });
-  }
-  await db.updateModule("events", events, `@${session.username}`);
-  res.json({ success: true, message: "Event deleted successfully" });
-});
-apiRouter.get("/achievements", async (req, res) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().achievements || [] });
-});
-apiRouter.post("/achievements", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "achievements");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, category, year_bs, year_ad, description_en, description_np, image, student_name, rank_or_award } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "Achievement title is required" });
-  }
-  const achievements = [...db.getState().achievements || []];
-  const newAch = {
-    id: Date.now(),
-    title_en,
-    title_np: title_np || title_en,
-    year: String(year_bs || year_ad || "\u0968\u0966\u096E\u0966"),
-    desc_en: description_en || "",
-    desc_np: description_np || "",
-    category: category || "academic",
-    image: image || "",
-    student_name_en: student_name || "",
-    position_rank: rank_or_award || "",
-    published: true
-  };
-  achievements.unshift(newAch);
-  await db.updateModule("achievements", achievements, `@${session.username}`);
-  res.status(201).json({ success: true, data: newAch });
-});
-apiRouter.put("/achievements/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "achievements");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const achievements = [...db.getState().achievements || []];
-  const idx = achievements.findIndex((a) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Achievement not found" });
-  }
-  achievements[idx] = { ...achievements[idx], ...req.body };
-  await db.updateModule("achievements", achievements, `@${session.username}`);
-  res.json({ success: true, data: achievements[idx] });
-});
-apiRouter.delete("/achievements/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "achievements");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let achievements = [...db.getState().achievements || []];
-  const prevCount = achievements.length;
-  achievements = achievements.filter((a) => String(a.id) !== String(req.params.id));
-  if (achievements.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Achievement not found" });
-  }
-  await db.updateModule("achievements", achievements, `@${session.username}`);
-  res.json({ success: true, message: "Achievement deleted successfully" });
-});
-apiRouter.post("/gallery", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "gallery");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, category, image_url, caption_en, caption_np } = req.body;
-  const gallery = [...db.getState().gallery || []];
-  const newItem = {
-    id: Date.now(),
-    title_en: title_en || "Campus Activity",
-    title_np: title_np || title_en || "\u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0917\u0924\u093F\u0935\u093F\u0927\u093F",
-    category: category || "campus",
-    url: image_url || req.body.url || "",
-    caption_en: caption_en || "",
-    caption_np: caption_np || ""
-  };
-  gallery.unshift(newItem);
-  await db.updateModule("gallery", gallery, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-apiRouter.put("/gallery/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "gallery");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const gallery = [...db.getState().gallery || []];
-  const idx = gallery.findIndex((g) => String(g.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Gallery item not found" });
-  }
-  gallery[idx] = { ...gallery[idx], ...req.body };
-  await db.updateModule("gallery", gallery, `@${session.username}`);
-  res.json({ success: true, data: gallery[idx] });
-});
-apiRouter.delete("/gallery/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "gallery");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let gallery = [...db.getState().gallery || []];
-  const prevCount = gallery.length;
-  gallery = gallery.filter((g) => String(g.id) !== String(req.params.id));
-  if (gallery.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Gallery item not found" });
-  }
-  await db.updateModule("gallery", gallery, `@${session.username}`);
-  res.json({ success: true, message: "Gallery item deleted successfully" });
-});
-apiRouter.post("/history", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "history");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { year_bs, year_ad, title_en, title_np, description_en, description_np, event_en, event_np, image, status } = req.body;
-  const history = [...db.getState().history || []];
-  const newItem = {
-    id: Date.now(),
-    year: String(year_bs || year_ad || "\u0968\u0966\u0969\u096B"),
-    title_en: title_en || event_en || "Historical Milestone",
-    title_np: title_np || event_np || title_en || "\u0910\u0924\u093F\u0939\u093E\u0938\u093F\u0915 \u0909\u092A\u0932\u092C\u094D\u0927\u093F",
-    desc_en: description_en || "",
-    desc_np: description_np || "",
-    image: image || "",
-    status: status || "published",
-    is_enabled: true
-  };
-  history.push(newItem);
-  await db.updateModule("history", history, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-apiRouter.put("/history/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "history");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const history = [...db.getState().history || []];
-  const idx = history.findIndex((h) => String(h.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "History item not found" });
-  }
-  history[idx] = { ...history[idx], ...req.body };
-  await db.updateModule("history", history, `@${session.username}`);
-  res.json({ success: true, data: history[idx] });
-});
-apiRouter.delete("/history/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "history");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let history = [...db.getState().history || []];
-  const prevCount = history.length;
-  history = history.filter((h) => String(h.id) !== String(req.params.id));
-  if (history.length === prevCount) {
-    return res.status(404).json({ success: false, error: "History item not found" });
-  }
-  await db.updateModule("history", history, `@${session.username}`);
-  res.json({ success: true, message: "History item deleted successfully" });
-});
-apiRouter.post("/curriculum", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "curriculumGuidelines");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, subject, class_level, file_url, original_filename, file_size_mb, status, description_en, description_np } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "Curriculum guideline title is required" });
-  }
-  const currList = [...db.getState().curriculumGuidelines || []];
-  const newItem = {
-    id: `curr-${Date.now()}`,
-    title_en,
-    title_np: title_np || title_en,
-    subject: subject || "General",
-    class_level: class_level || "Grade 10",
-    academic_level_id: class_level ? String(class_level).toLowerCase().replace(/\s+/g, "-") : "secondary",
-    file_url: file_url || "",
-    pdf_path: file_url || "",
-    original_filename: original_filename || "",
-    file_size_bytes: (Number(file_size_mb) || 1) * 1024 * 1024,
-    file_size_formatted: `${file_size_mb || 1} MB`,
-    mime_type: "application/pdf",
-    status: status === "draft" ? "unpublished" : "published",
-    description_en: description_en || "",
-    description_np: description_np || "",
-    display_order: currList.length + 1,
-    created_at: (/* @__PURE__ */ new Date()).toISOString(),
-    updated_at: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  currList.push(newItem);
-  await db.updateModule("curriculumGuidelines", currList, `@${session.username}`);
-  res.status(201).json({ success: true, data: newItem });
-});
-apiRouter.put("/curriculum/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "curriculumGuidelines");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const currList = [...db.getState().curriculumGuidelines || []];
-  const idx = currList.findIndex((c) => String(c.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Curriculum guideline not found" });
-  }
-  currList[idx] = { ...currList[idx], ...req.body, updated_at: (/* @__PURE__ */ new Date()).toISOString() };
-  await db.updateModule("curriculumGuidelines", currList, `@${session.username}`);
-  res.json({ success: true, data: currList[idx] });
-});
-apiRouter.delete("/curriculum/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "curriculumGuidelines");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let currList = [...db.getState().curriculumGuidelines || []];
-  const prevCount = currList.length;
-  currList = currList.filter((c) => String(c.id) !== String(req.params.id));
-  if (currList.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Curriculum guideline not found" });
-  }
-  await db.updateModule("curriculumGuidelines", currList, `@${session.username}`);
-  res.json({ success: true, message: "Curriculum guideline deleted successfully" });
-});
-apiRouter.get("/about", async (req, res) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().aboutSections || [] });
-});
-apiRouter.post("/about", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "aboutSections");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, category, content_en, content_np, image, icon } = req.body;
-  if (!title_en) {
-    return res.status(400).json({ success: false, error: "About section title is required" });
-  }
-  const aboutList = [...db.getState().aboutSections || []];
-  const newSection = {
-    id: `about-${Date.now()}`,
-    title_en,
-    title_np: title_np || title_en,
-    category: category || "overview",
-    content_en: content_en || "",
-    content_np: content_np || "",
-    image: image || "",
-    icon: icon || "Compass",
-    display_order: aboutList.length + 1,
-    status: "published",
-    is_enabled: true
-  };
-  aboutList.push(newSection);
-  await db.updateModule("aboutSections", aboutList, `@${session.username}`);
-  res.status(201).json({ success: true, data: newSection });
-});
-apiRouter.put("/about/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "aboutSections");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const aboutList = [...db.getState().aboutSections || []];
-  const idx = aboutList.findIndex((a) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "About section not found" });
-  }
-  aboutList[idx] = { ...aboutList[idx], ...req.body };
-  await db.updateModule("aboutSections", aboutList, `@${session.username}`);
-  res.json({ success: true, data: aboutList[idx] });
-});
-apiRouter.delete("/about/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "aboutSections");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let aboutList = [...db.getState().aboutSections || []];
-  const prevCount = aboutList.length;
-  aboutList = aboutList.filter((a) => String(a.id) !== String(req.params.id));
-  if (aboutList.length === prevCount) {
-    return res.status(404).json({ success: false, error: "About section not found" });
-  }
-  await db.updateModule("aboutSections", aboutList, `@${session.username}`);
-  res.json({ success: true, message: "About section deleted successfully" });
-});
-apiRouter.get("/vacancies", async (req, res) => {
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().vacancies || [] });
-});
-apiRouter.post("/vacancies", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "vacancies");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const { title_en, title_np, position_en, position_np, subject, count, deadline_en, deadline_np, qualifications_en, qualifications_np, description_en, description_np, pdf_url } = req.body;
-  if (!title_en && !position_en) {
-    return res.status(400).json({ success: false, error: "Vacancy position or title is required" });
-  }
-  const vacancies = [...db.getState().vacancies || []];
-  const newVac = {
-    id: `vac-${Date.now()}`,
-    title_en: title_en || position_en || "Teacher Vacancy",
-    title_np: title_np || position_np || title_en || position_en || "\u0936\u093F\u0915\u094D\u0937\u0915 \u0906\u0935\u0936\u094D\u092F\u0915\u0924\u093E",
-    department: subject || "Academic",
-    employment_type: "full_time",
-    positions_count: Number(count) || 1,
-    short_description_en: (description_en || qualifications_en || "").slice(0, 150),
-    description_en: description_en || qualifications_en || "Vacancy details available in attachment",
-    description_np: description_np || qualifications_np || "",
-    qualifications: qualifications_en ? [qualifications_en] : [],
-    application_method: "in_person",
-    application_deadline: deadline_en || new Date(Date.now() + 15 * 864e5).toISOString().split("T")[0],
-    apply_now_enabled: true,
-    pdf_url: pdf_url || "",
-    ...req.body
-  };
-  vacancies.unshift(newVac);
-  await db.updateModule("vacancies", vacancies, `@${session.username}`);
-  res.status(201).json({ success: true, data: newVac });
-});
-apiRouter.put("/vacancies/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "vacancies");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  const vacancies = [...db.getState().vacancies || []];
-  const idx = vacancies.findIndex((v) => String(v.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Vacancy not found" });
-  }
-  vacancies[idx] = { ...vacancies[idx], ...req.body };
-  await db.updateModule("vacancies", vacancies, `@${session.username}`);
-  res.json({ success: true, data: vacancies[idx] });
-});
-apiRouter.delete("/vacancies/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "vacancies");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  let vacancies = [...db.getState().vacancies || []];
-  const prevCount = vacancies.length;
-  vacancies = vacancies.filter((v) => String(v.id) !== String(req.params.id));
-  if (vacancies.length === prevCount) {
-    return res.status(404).json({ success: false, error: "Vacancy not found" });
-  }
-  await db.updateModule("vacancies", vacancies, `@${session.username}`);
-  res.json({ success: true, message: "Vacancy deleted successfully" });
-});
-apiRouter.get("/admin/accounts", requireAuth, async (req, res) => {
-  const session = req.session;
-  if (session.role !== "super_admin") {
-    return res.status(403).json({ success: false, error: "Super Admin privilege required" });
-  }
-  await db.ensureLoaded();
-  const accounts = db.getState().adminAccounts.map((a) => ({
-    ...a,
-    passwordHash: "[PROTECTED_BCRYPT_HASH]"
-  }));
-  res.json({ success: true, data: accounts });
-});
-apiRouter.post("/admin/accounts", requireAuth, async (req, res) => {
-  const session = req.session;
-  if (session.role !== "super_admin") {
-    return res.status(403).json({ success: false, error: "Super Admin privilege required to create accounts" });
-  }
-  const { username, fullName, email, role, permissions, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ success: false, error: "Username and initial password are required" });
-  }
-  const accounts = [...db.getState().adminAccounts];
-  if (accounts.some((a) => a.username.toLowerCase() === String(username).toLowerCase().trim())) {
-    return res.status(400).json({ success: false, error: "Username already in use" });
-  }
-  const newAccount = {
-    id: `acc-${Date.now()}`,
-    username: String(username).trim().toLowerCase(),
-    fullName: fullName || username,
-    email: email || "",
-    role: role === "super_admin" ? "super_admin" : "admin",
-    permissions: role === "super_admin" ? ALL_PERMISSIONS.map((p) => p.key) : permissions || [],
-    passwordHash: hashPasswordBcrypt(password),
-    salt: "",
-    status: "active",
-    isActive: true,
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  accounts.push(newAccount);
-  await db.updateModule("adminAccounts", accounts, `@${session.username}`);
-  res.status(201).json({
-    success: true,
-    data: { ...newAccount, passwordHash: "[PROTECTED_BCRYPT_HASH]" }
-  });
-});
-apiRouter.put("/admin/accounts/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  if (session.role !== "super_admin") {
-    return res.status(403).json({ success: false, error: "Super Admin privilege required to update accounts" });
-  }
-  const accounts = [...db.getState().adminAccounts];
-  const idx = accounts.findIndex((a) => String(a.id) === String(req.params.id));
-  if (idx === -1) {
-    return res.status(404).json({ success: false, error: "Account not found" });
-  }
-  const updated = { ...accounts[idx], ...req.body };
-  if (req.body.password) {
-    updated.passwordHash = hashPasswordBcrypt(req.body.password);
-  }
-  accounts[idx] = updated;
-  await db.updateModule("adminAccounts", accounts, `@${session.username}`);
-  res.json({
-    success: true,
-    data: { ...updated, passwordHash: "[PROTECTED_BCRYPT_HASH]" }
-  });
-});
-apiRouter.delete("/admin/accounts/:id", requireAuth, async (req, res) => {
-  const session = req.session;
-  if (session.role !== "super_admin") {
-    return res.status(403).json({ success: false, error: "Super Admin privilege required to delete accounts" });
-  }
-  let accounts = [...db.getState().adminAccounts];
-  const target = accounts.find((a) => String(a.id) === String(req.params.id));
-  if (!target) {
-    return res.status(404).json({ success: false, error: "Account not found" });
-  }
-  if (target.id === session.userId) {
-    return res.status(400).json({ success: false, error: "Cannot delete your own active administrator account" });
-  }
-  accounts = accounts.filter((a) => String(a.id) !== String(req.params.id));
-  await db.updateModule("adminAccounts", accounts, `@${session.username}`);
-  res.json({ success: true, message: "Administrator account deleted successfully" });
-});
-apiRouter.get("/admin/audit-logs", requireAuth, async (req, res) => {
-  const session = req.session;
-  const permCheck = db.checkPermission(session, "auditLogs");
-  if (!permCheck.allowed) {
-    return res.status(403).json({ success: false, error: permCheck.reason || "Forbidden" });
-  }
-  await db.ensureLoaded();
-  res.json({ success: true, data: db.getState().auditLogs || [] });
 });
 apiRouter.get("/cms/stream", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -3800,7 +3066,6 @@ apiRouter.get("/weather", async (req, res) => {
   }
 });
 var handleAdminLogin = async (req, res) => {
-  await db.ensureLoaded();
   const { username, password, loginType, masterKey } = req.body;
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "127.0.0.1";
   const userAgent = req.headers["user-agent"] || "Unknown Browser";
@@ -3940,15 +3205,13 @@ var handleAdminLogin = async (req, res) => {
     );
     await db.updateModule("adminAccounts", updatedAccounts, "System Auth", clientIp);
     const session = db.createSession(matchingAccount, clientIp, userAgent);
-    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 60;
+    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 30;
     const isProduction = process.env.NODE_ENV === "production";
-    const isSecure = isProduction || isServerlessEnvironment || Boolean(req.headers["x-forwarded-proto"] === "https") || req.secure;
     res.cookie("ishwari_session", session.token, {
       httpOnly: true,
-      secure: isSecure,
+      secure: isProduction,
       sameSite: "lax",
-      path: "/",
-      maxAge: Math.max(timeoutMinutes, 60) * 60 * 1e3
+      maxAge: timeoutMinutes * 60 * 1e3
     });
     await db.appendAuditLog({
       action: isMasterKeyAttempt ? "ADMIN_MASTER_KEY_LOGIN_SUCCESS" : "ADMIN_LOGIN_SUCCESS",
@@ -3979,8 +3242,7 @@ var handleAdminLogin = async (req, res) => {
 };
 apiRouter.post("/auth/login", handleAdminLogin);
 apiRouter.post("/login", handleAdminLogin);
-apiRouter.get("/auth/me", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.get("/auth/me", (req, res) => {
   const token = extractToken(req);
   const session = db.validateSession(token);
   if (!session) {
@@ -4009,8 +3271,7 @@ apiRouter.get("/auth/me", async (req, res) => {
     sessionExpiresAt: session.expiresAt
   });
 });
-apiRouter.post("/auth/logout", async (req, res) => {
-  await db.ensureLoaded();
+apiRouter.post("/auth/logout", (req, res) => {
   const token = extractToken(req);
   const session = db.validateSession(token);
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "127.0.0.1";
@@ -4028,12 +3289,10 @@ apiRouter.post("/auth/logout", async (req, res) => {
     });
   }
   const isProduction = process.env.NODE_ENV === "production";
-  const isSecure = isProduction || isServerlessEnvironment || Boolean(req.headers["x-forwarded-proto"] === "https") || req.secure;
   res.clearCookie("ishwari_session", {
     httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
-    path: "/"
+    secure: isProduction,
+    sameSite: "lax"
   });
   res.json({ success: true, message: "Logged out successfully" });
 });
@@ -4095,7 +3354,6 @@ apiRouter.post("/cms/sync", requireAuth, async (req, res) => {
   const { module, data, batch, actor } = req.body;
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "127.0.0.1";
   const effectiveActor = actor || `@${session.username} (${session.role})`;
-  const clientVer = Number(req.headers["x-cms-client-version"]) || void 0;
   try {
     if (batch && typeof batch === "object") {
       for (const moduleKey of Object.keys(batch)) {
@@ -4118,7 +3376,7 @@ apiRouter.post("/cms/sync", requireAuth, async (req, res) => {
           return;
         }
       }
-      const result2 = await db.updateBatch(batch, effectiveActor, clientIp, clientVer);
+      const result2 = await db.updateBatch(batch, effectiveActor, clientIp);
       res.json({ success: true, ...result2 });
       return;
     }
@@ -4360,7 +3618,7 @@ apiRouter.post("/cms/sync", requireAuth, async (req, res) => {
         }
       }
     }
-    const result = await db.updateModule(module, data, effectiveActor, clientIp, clientVer);
+    const result = await db.updateModule(module, data, effectiveActor, clientIp);
     res.json({ success: true, ...result });
   } catch (err) {
     console.error("Error during CMS sync:", err);
@@ -4414,7 +3672,7 @@ apiRouter.post("/contact/submit", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to record message in database" });
   }
 });
-apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
+apiRouter.post("/cms/upload", requireAuth, (req, res) => {
   const { fileName, fileType, base64Data, category } = req.body;
   if (!base64Data || !fileName) {
     res.status(400).json({ success: false, error: "Missing file data or file name" });
@@ -4443,7 +3701,6 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
     const uniqueFileName = `curr-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
     const filePath = path.join(currUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, "curriculum", "application/pdf", base64Data, sizeInBytes);
     const formattedSize = sizeInBytes < 1024 * 1024 ? `${Math.round(sizeInBytes / 1024)} KB` : `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
     res.json({
       success: true,
@@ -4474,7 +3731,6 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
     const uniqueFileName = `vac-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
     const filePath = path.join(vacUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, "vacancies", "application/pdf", base64Data, sizeInBytes);
     const formattedSize = sizeInBytes < 1024 * 1024 ? `${Math.round(sizeInBytes / 1024)} KB` : `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
     res.json({
       success: true,
@@ -4500,21 +3756,6 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
       res.status(400).json({ success: false, error: "Invalid file signature. File is not a valid PDF document." });
       return;
     }
-    const docUploadDir = getBackendUploadDir("documents");
-    const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
-    const uniqueFileName = `doc-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
-    const filePath = path.join(docUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, "documents", "application/pdf", base64Data, sizeInBytes);
-    res.json({
-      success: true,
-      url: `/api/document/file/${uniqueFileName}`,
-      fileName,
-      uniqueFileName,
-      size: sizeInBytes,
-      base64Data
-    });
-    return;
   } else if (category === "about_image" || category === "about") {
     const ext = path.extname(fileName).toLowerCase();
     if (![".png", ".jpg", ".jpeg", ".gif"].includes(ext)) {
@@ -4543,13 +3784,11 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
       return;
     }
     const mediaType = isGif ? "gif" : "image";
-    const mimeType = isGif ? "image/gif" : isPng ? "image/png" : "image/jpeg";
     const aboutUploadDir = getBackendUploadDir("about");
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueFileName = `about-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
     const filePath = path.join(aboutUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, "about", mimeType, base64Data, sizeInBytes);
     res.json({
       success: true,
       url: `/api/about/file/${uniqueFileName}`,
@@ -4588,13 +3827,11 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
       return;
     }
     const mediaType = isGif ? "gif" : "image";
-    const mimeType = isGif ? "image/gif" : isPng ? "image/png" : "image/jpeg";
     const historyUploadDir = getBackendUploadDir("history");
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueFileName = `history-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
     const filePath = path.join(historyUploadDir, uniqueFileName);
     fs.writeFileSync(filePath, buffer);
-    await db.saveUploadedFile(uniqueFileName, "history", mimeType, base64Data, sizeInBytes);
     res.json({
       success: true,
       url: `/api/history/file/${uniqueFileName}`,
@@ -4660,83 +3897,30 @@ apiRouter.get("/curriculum", (req, res) => {
     data: list
   });
 });
-apiRouter.get("/curriculum/file/:filename", async (req, res) => {
+apiRouter.get("/curriculum/file/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  const download = req.query.download === "1" || req.query.download === "true";
-  const originalName = req.query.name ? String(req.query.name) : filename;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader(
-    "Content-Disposition",
-    `${download ? "attachment" : "inline"}; filename="${encodeURIComponent(originalName)}"`
-  );
-  res.setHeader("Cache-Control", "public, max-age=3600");
   const filePath = resolveUploadFilePath("curriculum", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath);
-    res.setHeader("Content-Length", stat.size);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: "Curriculum PDF resource not found on server" });
     return;
   }
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(",");
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, "base64");
-    res.setHeader("Content-Length", fileBuf.length);
-    try {
-      const localDir = getBackendUploadDir("curriculum");
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {
-    }
-    res.send(fileBuf);
-    return;
-  }
-  res.status(404).json({ success: false, error: "Curriculum PDF resource not found on server" });
-});
-apiRouter.get("/document/file/:filename", async (req, res) => {
-  const filename = path.basename(req.params.filename);
-  if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
-    res.status(400).json({ success: false, error: "Invalid file identifier" });
-    return;
-  }
+  const stat = fs.statSync(filePath);
   const download = req.query.download === "1" || req.query.download === "true";
   const originalName = req.query.name ? String(req.query.name) : filename;
   res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Length", stat.size);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader(
     "Content-Disposition",
     `${download ? "attachment" : "inline"}; filename="${encodeURIComponent(originalName)}"`
   );
   res.setHeader("Cache-Control", "public, max-age=3600");
-  const filePath = resolveUploadFilePath("documents", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    const stat = fs.statSync(filePath);
-    res.setHeader("Content-Length", stat.size);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-    return;
-  }
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(",");
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, "base64");
-    res.setHeader("Content-Length", fileBuf.length);
-    try {
-      const localDir = getBackendUploadDir("documents");
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {
-    }
-    res.send(fileBuf);
-    return;
-  }
-  res.status(404).json({ success: false, error: "Document PDF resource not found on server" });
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 });
 apiRouter.get("/history", (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
@@ -4758,142 +3942,112 @@ apiRouter.get("/history", (req, res) => {
     data: list
   });
 });
-apiRouter.get("/about/file/:filename", async (req, res) => {
+apiRouter.get("/about/file/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
+    return;
+  }
+  const filePath = resolveUploadFilePath("about", filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: "About media resource not found" });
     return;
   }
   const ext = path.extname(filename).toLowerCase();
   const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
   res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=86400, immutable");
-  const filePath = resolveUploadFilePath("about", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(",");
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, "base64");
-    try {
-      const localDir = getBackendUploadDir("about");
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {
-    }
-    res.send(fileBuf);
-    return;
-  }
-  res.status(404).json({ success: false, error: "About media resource not found" });
+  res.sendFile(filePath);
 });
-apiRouter.delete("/about/file/:filename", requireAuth, async (req, res) => {
+apiRouter.delete("/about/file/:filename", requireAuth, (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath("about", filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {
+      res.json({ success: true, message: "Media file deleted successfully" });
+      return;
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Failed to delete file" });
+      return;
     }
   }
-  res.json({ success: true, message: "Media file deleted successfully" });
+  res.json({ success: true, message: "File does not exist or already removed" });
 });
-apiRouter.get("/history/file/:filename", async (req, res) => {
+apiRouter.get("/history/file/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
+    return;
+  }
+  const filePath = resolveUploadFilePath("history", filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: "History media resource not found" });
     return;
   }
   const ext = path.extname(filename).toLowerCase();
   const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
   res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=86400, immutable");
-  const filePath = resolveUploadFilePath("history", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(",");
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, "base64");
-    try {
-      const localDir = getBackendUploadDir("history");
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {
-    }
-    res.send(fileBuf);
-    return;
-  }
-  res.status(404).json({ success: false, error: "History media resource not found" });
+  res.sendFile(filePath);
 });
-apiRouter.delete("/history/file/:filename", requireAuth, async (req, res) => {
+apiRouter.delete("/history/file/:filename", requireAuth, (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath("history", filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {
+      res.json({ success: true, message: "History media file deleted successfully" });
+      return;
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Failed to delete file" });
+      return;
     }
   }
-  res.json({ success: true, message: "History media file deleted successfully" });
+  res.json({ success: true, message: "File does not exist or already removed" });
 });
-apiRouter.get("/vacancy/file/:filename", async (req, res) => {
+apiRouter.get("/vacancy/file/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
+    return;
+  }
+  const filePath = resolveUploadFilePath("vacancies", filename);
+  if (!filePath || !fs.existsSync(filePath)) {
+    res.status(404).json({ success: false, error: "Vacancy document not found" });
     return;
   }
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
   res.setHeader("Cache-Control", "public, max-age=86400");
-  const filePath = resolveUploadFilePath("vacancies", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-    return;
-  }
-  const remoteFile = await db.getUploadedFile(filename);
-  if (remoteFile && remoteFile.base64Data) {
-    const commaIdx = remoteFile.base64Data.indexOf(",");
-    const rawB64 = commaIdx >= 0 ? remoteFile.base64Data.slice(commaIdx + 1) : remoteFile.base64Data;
-    const fileBuf = Buffer.from(rawB64, "base64");
-    try {
-      const localDir = getBackendUploadDir("vacancies");
-      fs.writeFileSync(path.join(localDir, filename), fileBuf);
-    } catch {
-    }
-    res.send(fileBuf);
-    return;
-  }
-  res.status(404).json({ success: false, error: "Vacancy document not found" });
+  res.sendFile(filePath);
 });
-apiRouter.delete("/vacancy/file/:filename", requireAuth, async (req, res) => {
+apiRouter.delete("/vacancy/file/:filename", requireAuth, (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.pdf$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  await db.deleteUploadedFile(filename);
   const filePath = resolveUploadFilePath("vacancies", filename);
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch {
+      res.json({ success: true, message: "Vacancy PDF deleted successfully" });
+      return;
+    } catch (e) {
+      res.status(500).json({ success: false, error: "Failed to delete file" });
+      return;
     }
   }
-  res.json({ success: true, message: "Vacancy PDF deleted successfully" });
+  res.json({ success: true, message: "File does not exist or already removed" });
 });
 
 // backend/app.ts

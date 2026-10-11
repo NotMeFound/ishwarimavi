@@ -248,6 +248,17 @@ export const MAIN_MENU_HIERARCHY: MainMenuHierarchyDef[] = [
           { key: 'history.delete', labelEn: 'Delete Milestone', labelNp: 'कोसेढुङ्गा मेटाउनुहोस्', descEn: 'Can delete history records' },
         ]
       },
+      {
+        key: 'submenu.content_faq',
+        tabId: 'content_faq',
+        labelEn: 'FAQs & Q&A',
+        labelNp: 'प्रायः सोधिने प्रश्नहरू (FAQ)',
+        descEn: 'Public Q&A, admissions guidance, and common school information',
+        actions: [
+          { key: 'about.view', labelEn: 'View FAQs', labelNp: 'FAQ हेर्नुहोस्', descEn: 'Can view published FAQs' },
+          { key: 'about.update', labelEn: 'Manage FAQs', labelNp: 'FAQ व्यवस्थापन', descEn: 'Can add, edit, and publish FAQs' },
+        ]
+      },
     ]
   },
   {
