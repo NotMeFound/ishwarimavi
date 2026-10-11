@@ -413,11 +413,11 @@ class CMSDatabaseManager {
         this.isInitialLoadDone = true;
         return this.state;
       } catch (err) {
-        console.error('[CMS Firestore] Error in ensureLoaded, falling back to local state:', err);
+        console.error('[CMS Firestore] Failed to refresh authoritative state:', err);
         if (!this.state) {
           this.state = this.getDefaultState();
         }
-        return this.state;
+        throw err;
       } finally {
         this.loadPromise = null;
       }
@@ -876,10 +876,6 @@ class CMSDatabaseManager {
         moduleId: String(moduleKey),
         data,
         updatedAt: nowIso
-      }),
-      setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
-        version: newVersion,
-        lastModified: nowIso
       })
     ];
 
@@ -894,6 +890,10 @@ class CMSDatabaseManager {
     }
 
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
+      version: newVersion,
+      lastModified: nowIso
+    });
 
     this.emitter.emit('change', { module: String(moduleKey), version: newVersion, lastModified: nowIso });
     return { version: newVersion, lastModified: nowIso };
@@ -956,14 +956,14 @@ class CMSDatabaseManager {
         moduleId: 'auditLogs',
         data: s.auditLogs,
         updatedAt: nowIso
-      }),
-      setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
-        version: newVersion,
-        lastModified: nowIso
       })
     );
 
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
+      version: newVersion,
+      lastModified: nowIso
+    });
 
     this.emitter.emit('change', { module: 'batch', version: newVersion, lastModified: nowIso });
     return { version: newVersion, lastModified: nowIso };
@@ -992,12 +992,12 @@ class CMSDatabaseManager {
         moduleId: 'messages',
         data: s.messages,
         updatedAt: s.lastModified
-      }),
-      setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
-        version: s.version,
-        lastModified: s.lastModified
       })
     ]);
+    await setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
+      version: s.version,
+      lastModified: s.lastModified
+    });
 
     this.emitter.emit('change', { module: 'messages', version: s.version, lastModified: s.lastModified });
     return newMsg;
@@ -1046,14 +1046,11 @@ class CMSDatabaseManager {
       })
     );
 
-    writes.push(
-      setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
-        version: defaultState.version,
-        lastModified: defaultState.lastModified
-      })
-    );
-
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, 'cms_modules', '_metadata'), {
+      version: defaultState.version,
+      lastModified: defaultState.lastModified
+    });
 
     this.state = defaultState;
     this.emitter.emit('change', { module: 'all', version: defaultState.version, lastModified: defaultState.lastModified });

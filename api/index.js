@@ -2154,11 +2154,11 @@ var CMSDatabaseManager = class {
         this.isInitialLoadDone = true;
         return this.state;
       } catch (err) {
-        console.error("[CMS Firestore] Error in ensureLoaded, falling back to local state:", err);
+        console.error("[CMS Firestore] Failed to refresh authoritative state:", err);
         if (!this.state) {
           this.state = this.getDefaultState();
         }
-        return this.state;
+        throw err;
       } finally {
         this.loadPromise = null;
       }
@@ -2562,10 +2562,6 @@ var CMSDatabaseManager = class {
         moduleId: String(moduleKey),
         data,
         updatedAt: nowIso
-      }),
-      setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
-        version: newVersion,
-        lastModified: nowIso
       })
     ];
     if (moduleKey !== "auditLogs") {
@@ -2578,6 +2574,10 @@ var CMSDatabaseManager = class {
       );
     }
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
+      version: newVersion,
+      lastModified: nowIso
+    });
     this.emitter.emit("change", { module: String(moduleKey), version: newVersion, lastModified: nowIso });
     return { version: newVersion, lastModified: nowIso };
   }
@@ -2626,13 +2626,13 @@ var CMSDatabaseManager = class {
         moduleId: "auditLogs",
         data: s.auditLogs,
         updatedAt: nowIso
-      }),
-      setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
-        version: newVersion,
-        lastModified: nowIso
       })
     );
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
+      version: newVersion,
+      lastModified: nowIso
+    });
     this.emitter.emit("change", { module: "batch", version: newVersion, lastModified: nowIso });
     return { version: newVersion, lastModified: nowIso };
   }
@@ -2657,12 +2657,12 @@ var CMSDatabaseManager = class {
         moduleId: "messages",
         data: s.messages,
         updatedAt: s.lastModified
-      }),
-      setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
-        version: s.version,
-        lastModified: s.lastModified
       })
     ]);
+    await setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
+      version: s.version,
+      lastModified: s.lastModified
+    });
     this.emitter.emit("change", { module: "messages", version: s.version, lastModified: s.lastModified });
     return newMsg;
   }
@@ -2704,13 +2704,11 @@ var CMSDatabaseManager = class {
         updatedAt: defaultState.lastModified
       })
     );
-    writes.push(
-      setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
-        version: defaultState.version,
-        lastModified: defaultState.lastModified
-      })
-    );
     await Promise.all(writes);
+    await setDoc(doc(this.firestore, "cms_modules", "_metadata"), {
+      version: defaultState.version,
+      lastModified: defaultState.lastModified
+    });
     this.state = defaultState;
     this.emitter.emit("change", { module: "all", version: defaultState.version, lastModified: defaultState.lastModified });
     return { version: defaultState.version, lastModified: defaultState.lastModified };
@@ -2874,6 +2872,9 @@ apiRouter.use((req, res, next) => {
   res.setHeader("Expires", "0");
   next();
 });
+apiRouter.use((req, res, next) => {
+  db.ensureLoaded().then(() => next()).catch(next);
+});
 function extractToken(req) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -2966,7 +2967,7 @@ apiRouter.get("/cms/state", async (req, res, next) => {
     data: publicData
   });
 });
-apiRouter.get("/cms/version", (req, res) => {
+apiRouter.get("/cms/version", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
   const versionInfo = db.getVersion();

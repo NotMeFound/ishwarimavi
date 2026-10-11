@@ -165,7 +165,7 @@ async function safeExtractResponseSnippet(res: Response, maxLength = 300): Promi
 
 class APIClient {
   private currentVersion = 0;
-  private isFetching = false;
+  private stateFetchPromise: Promise<CMSStateResponse | null> | null = null;
   private listeners: Set<(data: AuthoritativeCMSData, version: number) => void> = new Set();
   private sessionToken: string | null = null;
   private errorLogs: ApiErrorLogItem[] = [];
@@ -530,10 +530,25 @@ class APIClient {
    * Independent authoritative database fetch.
    * Never relies on admin browser state or local-only storage.
    */
-  public async fetchAuthoritativeState(): Promise<CMSStateResponse | null> {
-    if (this.isFetching) return null;
-    this.isFetching = true;
+  public async fetchAuthoritativeState(forceRefresh = false): Promise<CMSStateResponse | null> {
+    if (this.stateFetchPromise) {
+      if (!forceRefresh) return this.stateFetchPromise;
+      await this.stateFetchPromise;
+      if (this.stateFetchPromise) return this.stateFetchPromise;
+    }
 
+    const request = this.requestAuthoritativeState();
+    this.stateFetchPromise = request;
+    try {
+      return await request;
+    } finally {
+      if (this.stateFetchPromise === request) {
+        this.stateFetchPromise = null;
+      }
+    }
+  }
+
+  private async requestAuthoritativeState(): Promise<CMSStateResponse | null> {
     try {
       const url = getApiUrl('/api/cms/state');
       const res = await fetch(url, {
@@ -574,8 +589,6 @@ class APIClient {
     } catch (err) {
       console.warn('[CMS Sync] Backend fetch error:', err);
       return null;
-    } finally {
-      this.isFetching = false;
     }
   }
 
@@ -646,7 +659,7 @@ class APIClient {
 
       if (res.status === 409) {
         // Concurrency version conflict - re-fetch fresh state
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
         return { success: false, error: json?.error || 'Version conflict (HTTP 409): Newer content was published. State re-synchronized.' };
       }
 
@@ -665,7 +678,7 @@ class APIClient {
       if (res.ok && json?.success) {
         this.currentVersion = json.version;
         // Immediately trigger authoritative fetch so UI synchronizes with database
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
         return { success: true };
       }
       return { success: false, error: json?.error || `Failed with status ${res.status}` };
@@ -713,7 +726,7 @@ class APIClient {
       }
 
       if (res.status === 409) {
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
         return { success: false, error: json?.error || 'Version conflict (HTTP 409): State re-synchronized.' };
       }
 
@@ -724,7 +737,7 @@ class APIClient {
       if (res.ok && json?.success) {
         this.currentVersion = json.version;
         // Immediately trigger authoritative fetch so UI synchronizes with database
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
         return { success: true };
       }
       return { success: false, error: json?.error || `Failed with status ${res.status}` };
@@ -785,7 +798,7 @@ class APIClient {
       });
       const json = await safeParseJson(res);
       if (res.ok && json?.success) {
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
         return { success: true };
       }
       return { success: false, error: json?.error || 'Failed to reset database' };
@@ -852,7 +865,7 @@ class APIClient {
             sseRetryCount = 0;
             const payload = JSON.parse(e.data);
             if (payload && payload.version > this.currentVersion) {
-              await this.fetchAuthoritativeState();
+              await this.fetchAuthoritativeState(true);
             }
           } catch {
             // Safely ignore malformed update frames
@@ -878,20 +891,20 @@ class APIClient {
     // 1. Start SSE stream
     connectSSE();
 
-    // 2. Auxiliary Polling Fallback (Runs every 8 seconds to guarantee freshness even behind restrictive proxies)
+    // 2. Auxiliary Polling Fallback (SSE is unavailable on Vercel serverless functions)
     pollInterval = setInterval(async () => {
       const check = await this.checkVersion();
       if (check && check.hasUpdate) {
-        await this.fetchAuthoritativeState();
+        await this.fetchAuthoritativeState(true);
       }
-    }, 8000);
+    }, 5000);
 
     // 3. Focus / Visibility Resumption
     const handleVisibilityChange = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         const check = await this.checkVersion();
         if (check && check.hasUpdate) {
-          await this.fetchAuthoritativeState();
+          await this.fetchAuthoritativeState(true);
         }
       }
     };

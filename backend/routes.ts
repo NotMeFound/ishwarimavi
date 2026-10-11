@@ -66,6 +66,10 @@ apiRouter.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+apiRouter.use((req: Request, res: Response, next: NextFunction) => {
+  db.ensureLoaded().then(() => next()).catch(next);
+});
+
 // Helper to extract session token from Authorization header or cookies
 export function extractToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
@@ -176,7 +180,7 @@ apiRouter.get('/cms/state', async (req: Request, res: Response, next: NextFuncti
 });
 
 // 3. Ultra-lightweight Version Check (For Polling & Tab Resumption)
-apiRouter.get('/cms/version', (req: Request, res: Response) => {
+apiRouter.get('/cms/version', async (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   const versionInfo = db.getVersion();
