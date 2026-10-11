@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { EventEmitter } from 'events';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, Firestore } from 'firebase/firestore';
 import {
   SchoolData,
   Notice,
@@ -476,10 +476,10 @@ class CMSDatabaseManager {
 
   /* ---------------- SESSION MANAGEMENT ---------------- */
 
-  public createSession(account: AdminAccount, ip: string, userAgent: string): ServerSession {
+  public async createSession(account: AdminAccount, ip: string, userAgent: string): Promise<ServerSession | null> {
     const timeoutMinutes = this.state.securityConfig?.sessionTimeoutMinutes || 60;
     const now = Date.now();
-    const sessionDurationMs = Math.max(1440, timeoutMinutes * 48) * 60 * 1000;
+    const sessionDurationMs = Math.max(1, timeoutMinutes) * 60 * 1000;
     const expiresAt = now + sessionDurationMs;
 
     const sessionData: Omit<ServerSession, 'token'> = {
@@ -497,6 +497,27 @@ class CMSDatabaseManager {
 
     const token = signStatelessToken(sessionData);
     const session: ServerSession = { ...sessionData, token };
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const lockRef = doc(this.firestore, 'session_role_locks', account.role);
+    const claimed = await runTransaction(this.firestore, async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
+      if (existingLock && Number(existingLock.expiresAt) > now) {
+        return false;
+      }
+
+      transaction.set(lockRef, {
+        tokenHash,
+        userId: account.id,
+        username: account.username,
+        expiresAt,
+        updatedAt: now
+      });
+      return true;
+    });
+
+    if (!claimed) return null;
 
     this.activeSessions.set(token, session);
 
@@ -520,7 +541,7 @@ class CMSDatabaseManager {
     return session;
   }
 
-  public validateSession(token: string | undefined): ServerSession | null {
+  public async validateSession(token: string | undefined): Promise<ServerSession | null> {
     if (!token) return null;
     if (this.revokedTokens.has(token)) return null;
 
@@ -547,6 +568,13 @@ class CMSDatabaseManager {
     );
     if (!account || account.status !== 'active') {
       this.activeSessions.delete(token);
+      await this.destroySession(token);
+      return null;
+    }
+
+    if (account.role !== session.role) {
+      this.activeSessions.delete(token);
+      await this.destroySession(token);
       return null;
     }
 
@@ -554,19 +582,37 @@ class CMSDatabaseManager {
     session.permissions = account.role === 'super_admin' ? ALL_PERMISSIONS.map((p) => p.key) : account.permissions;
     session.lastActivity = now;
 
-    const timeoutMinutes = s.securityConfig?.sessionTimeoutMinutes || 60;
-    const slideDurationMs = Math.max(1440, timeoutMinutes * 48) * 60 * 1000;
-    session.expiresAt = Math.max(session.expiresAt, now + slideDurationMs);
+    const lockSnapshot = await getDoc(doc(this.firestore, 'session_role_locks', session.role));
+    const roleLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (!roleLock || roleLock.tokenHash !== tokenHash || Number(roleLock.expiresAt) <= now) {
+      this.activeSessions.delete(token);
+      return null;
+    }
 
     return session;
   }
 
-  public destroySession(token: string | undefined): boolean {
+  public async destroySession(token: string | undefined): Promise<boolean> {
     if (!token) return false;
     this.revokedTokens.add(token);
+    const session = this.activeSessions.get(token) || verifyStatelessToken(token);
     this.activeSessions.delete(token);
     const sessionDocId = crypto.createHash('sha256').update(token).digest('hex');
-    deleteDoc(doc(this.firestore, 'sessions', sessionDocId)).catch(() => {});
+    const deletions: Promise<unknown>[] = [
+      deleteDoc(doc(this.firestore, 'sessions', sessionDocId))
+    ];
+    if (session) {
+      const lockRef = doc(this.firestore, 'session_role_locks', session.role);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      deletions.push(runTransaction(this.firestore, async (transaction) => {
+        const lockSnapshot = await transaction.get(lockRef);
+        if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
+          transaction.delete(lockRef);
+        }
+      }));
+    }
+    await Promise.all(deletions);
     return true;
   }
 

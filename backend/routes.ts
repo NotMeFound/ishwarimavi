@@ -83,18 +83,18 @@ export function extractToken(req: Request): string | undefined {
 // Authentication middleware for privileged operations
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  db.validateSession(token).then((session) => {
+    if (!session) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication session expired or invalid. Please log in to proceed.'
+      });
+      return;
+    }
 
-  if (!session) {
-    res.status(401).json({
-      success: false,
-      error: 'Authentication session expired or invalid. Please log in to proceed.'
-    });
-    return;
-  }
-
-  (req as any).session = session;
-  next();
+    (req as any).session = session;
+    next();
+  }).catch(next);
 }
 
 // 1. Health check
@@ -111,13 +111,19 @@ apiRouter.get('/health', (req: Request, res: Response) => {
 });
 
 // 2. Authoritative Database State
-apiRouter.get('/cms/state', (req: Request, res: Response) => {
+apiRouter.get('/cms/state', async (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session: ServerSession | null;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
 
   // If authenticated admin session, provide full operational data (sanitizing password hashes)
@@ -520,24 +526,54 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
     // Reset rate limiter on success
     db.recordSuccessfulAttempt(rateLimitId);
 
-    // Update account lastLogin timestamp in database
+    // Create the role-exclusive session before recording a successful login.
     const nowStr = new Date().toLocaleDateString('en-CA') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    let session: ServerSession | null;
+    try {
+      session = await db.createSession(matchingAccount, clientIp, userAgent);
+    } catch (err) {
+      console.error('[Authentication] Could not reserve role session:', err);
+      res.status(503).json({
+        success: false,
+        error: 'Unable to verify administrator session availability. Please try again.'
+      });
+      return;
+    }
+
+    if (!session) {
+      res.status(409).json({
+        success: false,
+        error: `A ${matchingAccount.role === 'super_admin' ? 'super administrator' : 'administrator'} is already signed in. Log out that session before another account of this role can log in.`
+      });
+      return;
+    }
+
     const updatedAccounts = state.adminAccounts.map((a) =>
       a.id === matchingAccount.id ? { ...a, lastLogin: nowStr } : a
     );
-    await db.updateModule('adminAccounts', updatedAccounts, 'System Auth', clientIp);
-
-    // Create secure server-side session with ID regeneration
-    const session = db.createSession(matchingAccount, clientIp, userAgent);
+    try {
+      await db.updateModule('adminAccounts', updatedAccounts, 'System Auth', clientIp);
+    } catch (err) {
+      console.error('[Authentication] Could not persist successful login:', err);
+      try {
+        await db.destroySession(session.token);
+      } catch (cleanupError) {
+        console.error('[Authentication] Could not release reserved role session:', cleanupError);
+      }
+      res.status(503).json({
+        success: false,
+        error: 'Unable to finish login right now. Please try again.'
+      });
+      return;
+    }
 
     // Set secure HttpOnly cookie for same-origin session
-    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 30;
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('ishwari_session', session.token, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
-      maxAge: timeoutMinutes * 60 * 1000
+      maxAge: Math.max(0, session.expiresAt - Date.now())
     });
 
     await db.appendAuditLog({
@@ -573,9 +609,15 @@ apiRouter.post('/auth/login', handleAdminLogin);
 apiRouter.post('/login', handleAdminLogin);
 
 // 6. Current Session Validation Endpoint
-apiRouter.get('/auth/me', (req: Request, res: Response) => {
+apiRouter.get('/auth/me', async (req: Request, res: Response, next: NextFunction) => {
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session: ServerSession | null;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
 
   if (!session) {
     res.status(401).json({ authenticated: false, error: 'Unauthorized: Session invalid or expired' });
@@ -586,7 +628,7 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
   const account = state.adminAccounts.find((a) => a.id === session.userId);
 
   if (!account || account.status !== 'active') {
-    db.destroySession(token);
+    await db.destroySession(token);
     res.status(401).json({ authenticated: false, reason: 'Account deactivated or deleted' });
     return;
   }
@@ -608,13 +650,28 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 });
 
 // 7. Secure Logout & Invalidation
-apiRouter.post('/auth/logout', (req: Request, res: Response) => {
+apiRouter.post('/auth/logout', async (req: Request, res: Response, next: NextFunction) => {
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session: ServerSession | null;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
 
   if (session) {
-    db.destroySession(token);
+    try {
+      await db.destroySession(token);
+    } catch (err) {
+      console.error('[Authentication] Could not release administrator session:', err);
+      res.status(503).json({
+        success: false,
+        error: 'Unable to complete logout. Please try again.'
+      });
+      return;
+    }
     db.appendAuditLog({
       action: 'ADMIN_LOGOUT',
       actor: session.username,
@@ -1304,10 +1361,16 @@ apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
 });
 
 // 12. Public & Filtered Curriculum Guidelines API
-apiRouter.get('/curriculum', (req: Request, res: Response) => {
+apiRouter.get('/curriculum', async (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session: ServerSession | null;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
   let list = [...(state.curriculumGuidelines || [])];
 
@@ -1393,10 +1456,16 @@ apiRouter.get('/curriculum/file/:filename', (req: Request, res: Response) => {
 });
 
 // 14. History Milestones API
-apiRouter.get('/history', (req: Request, res: Response) => {
+apiRouter.get('/history', async (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session: ServerSession | null;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
   let list = [...(state.history || [])];
 

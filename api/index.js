@@ -14,7 +14,7 @@ import crypto2 from "crypto";
 import bcrypt2 from "bcryptjs";
 import { EventEmitter } from "events";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
 
 // frontend/data/schoolData.ts
 var defaultWeatherConfig = {
@@ -2207,10 +2207,10 @@ var CMSDatabaseManager = class {
     };
   }
   /* ---------------- SESSION MANAGEMENT ---------------- */
-  createSession(account, ip, userAgent) {
+  async createSession(account, ip, userAgent) {
     const timeoutMinutes = this.state.securityConfig?.sessionTimeoutMinutes || 60;
     const now = Date.now();
-    const sessionDurationMs = Math.max(1440, timeoutMinutes * 48) * 60 * 1e3;
+    const sessionDurationMs = Math.max(1, timeoutMinutes) * 60 * 1e3;
     const expiresAt = now + sessionDurationMs;
     const sessionData = {
       userId: account.id,
@@ -2226,6 +2226,24 @@ var CMSDatabaseManager = class {
     };
     const token = signStatelessToken(sessionData);
     const session = { ...sessionData, token };
+    const tokenHash = crypto2.createHash("sha256").update(token).digest("hex");
+    const lockRef = doc(this.firestore, "session_role_locks", account.role);
+    const claimed = await runTransaction(this.firestore, async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : void 0;
+      if (existingLock && Number(existingLock.expiresAt) > now) {
+        return false;
+      }
+      transaction.set(lockRef, {
+        tokenHash,
+        userId: account.id,
+        username: account.username,
+        expiresAt,
+        updatedAt: now
+      });
+      return true;
+    });
+    if (!claimed) return null;
     this.activeSessions.set(token, session);
     const sessionDocId = crypto2.createHash("sha256").update(token).digest("hex");
     setDoc(doc(this.firestore, "sessions", sessionDocId), {
@@ -2244,7 +2262,7 @@ var CMSDatabaseManager = class {
     this.cleanExpiredSessions();
     return session;
   }
-  validateSession(token) {
+  async validateSession(token) {
     if (!token) return null;
     if (this.revokedTokens.has(token)) return null;
     let session = this.activeSessions.get(token);
@@ -2266,23 +2284,46 @@ var CMSDatabaseManager = class {
     );
     if (!account || account.status !== "active") {
       this.activeSessions.delete(token);
+      await this.destroySession(token);
+      return null;
+    }
+    if (account.role !== session.role) {
+      this.activeSessions.delete(token);
+      await this.destroySession(token);
       return null;
     }
     session.role = account.role;
     session.permissions = account.role === "super_admin" ? ALL_PERMISSIONS.map((p) => p.key) : account.permissions;
     session.lastActivity = now;
-    const timeoutMinutes = s.securityConfig?.sessionTimeoutMinutes || 60;
-    const slideDurationMs = Math.max(1440, timeoutMinutes * 48) * 60 * 1e3;
-    session.expiresAt = Math.max(session.expiresAt, now + slideDurationMs);
+    const lockSnapshot = await getDoc(doc(this.firestore, "session_role_locks", session.role));
+    const roleLock = lockSnapshot.exists() ? lockSnapshot.data() : void 0;
+    const tokenHash = crypto2.createHash("sha256").update(token).digest("hex");
+    if (!roleLock || roleLock.tokenHash !== tokenHash || Number(roleLock.expiresAt) <= now) {
+      this.activeSessions.delete(token);
+      return null;
+    }
     return session;
   }
-  destroySession(token) {
+  async destroySession(token) {
     if (!token) return false;
     this.revokedTokens.add(token);
+    const session = this.activeSessions.get(token) || verifyStatelessToken(token);
     this.activeSessions.delete(token);
     const sessionDocId = crypto2.createHash("sha256").update(token).digest("hex");
-    deleteDoc(doc(this.firestore, "sessions", sessionDocId)).catch(() => {
-    });
+    const deletions = [
+      deleteDoc(doc(this.firestore, "sessions", sessionDocId))
+    ];
+    if (session) {
+      const lockRef = doc(this.firestore, "session_role_locks", session.role);
+      const tokenHash = crypto2.createHash("sha256").update(token).digest("hex");
+      deletions.push(runTransaction(this.firestore, async (transaction) => {
+        const lockSnapshot = await transaction.get(lockRef);
+        if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
+          transaction.delete(lockRef);
+        }
+      }));
+    }
+    await Promise.all(deletions);
     return true;
   }
   getActiveSessions() {
@@ -2845,16 +2886,17 @@ function extractToken(req) {
 }
 function requireAuth(req, res, next) {
   const token = extractToken(req);
-  const session = db.validateSession(token);
-  if (!session) {
-    res.status(401).json({
-      success: false,
-      error: "Authentication session expired or invalid. Please log in to proceed."
-    });
-    return;
-  }
-  req.session = session;
-  next();
+  db.validateSession(token).then((session) => {
+    if (!session) {
+      res.status(401).json({
+        success: false,
+        error: "Authentication session expired or invalid. Please log in to proceed."
+      });
+      return;
+    }
+    req.session = session;
+    next();
+  }).catch(next);
 }
 apiRouter.get("/health", (req, res) => {
   const versionInfo = db.getVersion();
@@ -2867,12 +2909,18 @@ apiRouter.get("/health", (req, res) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-apiRouter.get("/cms/state", (req, res) => {
+apiRouter.get("/cms/state", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
   if (session) {
     const sanitizedAccounts = state.adminAccounts.map((acc) => ({
@@ -3200,18 +3248,48 @@ var handleAdminLogin = async (req, res) => {
   if (isAuthenticated) {
     db.recordSuccessfulAttempt(rateLimitId);
     const nowStr = (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA") + " " + (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    let session;
+    try {
+      session = await db.createSession(matchingAccount, clientIp, userAgent);
+    } catch (err) {
+      console.error("[Authentication] Could not reserve role session:", err);
+      res.status(503).json({
+        success: false,
+        error: "Unable to verify administrator session availability. Please try again."
+      });
+      return;
+    }
+    if (!session) {
+      res.status(409).json({
+        success: false,
+        error: `A ${matchingAccount.role === "super_admin" ? "super administrator" : "administrator"} is already signed in. Log out that session before another account of this role can log in.`
+      });
+      return;
+    }
     const updatedAccounts = state.adminAccounts.map(
       (a) => a.id === matchingAccount.id ? { ...a, lastLogin: nowStr } : a
     );
-    await db.updateModule("adminAccounts", updatedAccounts, "System Auth", clientIp);
-    const session = db.createSession(matchingAccount, clientIp, userAgent);
-    const timeoutMinutes = state.securityConfig?.sessionTimeoutMinutes || 30;
+    try {
+      await db.updateModule("adminAccounts", updatedAccounts, "System Auth", clientIp);
+    } catch (err) {
+      console.error("[Authentication] Could not persist successful login:", err);
+      try {
+        await db.destroySession(session.token);
+      } catch (cleanupError) {
+        console.error("[Authentication] Could not release reserved role session:", cleanupError);
+      }
+      res.status(503).json({
+        success: false,
+        error: "Unable to finish login right now. Please try again."
+      });
+      return;
+    }
     const isProduction = process.env.NODE_ENV === "production";
     res.cookie("ishwari_session", session.token, {
       httpOnly: true,
       secure: isProduction,
       sameSite: "lax",
-      maxAge: timeoutMinutes * 60 * 1e3
+      maxAge: Math.max(0, session.expiresAt - Date.now())
     });
     await db.appendAuditLog({
       action: isMasterKeyAttempt ? "ADMIN_MASTER_KEY_LOGIN_SUCCESS" : "ADMIN_LOGIN_SUCCESS",
@@ -3242,9 +3320,15 @@ var handleAdminLogin = async (req, res) => {
 };
 apiRouter.post("/auth/login", handleAdminLogin);
 apiRouter.post("/login", handleAdminLogin);
-apiRouter.get("/auth/me", (req, res) => {
+apiRouter.get("/auth/me", async (req, res, next) => {
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   if (!session) {
     res.status(401).json({ authenticated: false, error: "Unauthorized: Session invalid or expired" });
     return;
@@ -3252,7 +3336,7 @@ apiRouter.get("/auth/me", (req, res) => {
   const state = db.getState();
   const account = state.adminAccounts.find((a) => a.id === session.userId);
   if (!account || account.status !== "active") {
-    db.destroySession(token);
+    await db.destroySession(token);
     res.status(401).json({ authenticated: false, reason: "Account deactivated or deleted" });
     return;
   }
@@ -3271,12 +3355,27 @@ apiRouter.get("/auth/me", (req, res) => {
     sessionExpiresAt: session.expiresAt
   });
 });
-apiRouter.post("/auth/logout", (req, res) => {
+apiRouter.post("/auth/logout", async (req, res, next) => {
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "127.0.0.1";
   if (session) {
-    db.destroySession(token);
+    try {
+      await db.destroySession(token);
+    } catch (err) {
+      console.error("[Authentication] Could not release administrator session:", err);
+      res.status(503).json({
+        success: false,
+        error: "Unable to complete logout. Please try again."
+      });
+      return;
+    }
     db.appendAuditLog({
       action: "ADMIN_LOGOUT",
       actor: session.username,
@@ -3863,10 +3962,16 @@ apiRouter.post("/cms/upload", requireAuth, (req, res) => {
     size: sizeInBytes
   });
 });
-apiRouter.get("/curriculum", (req, res) => {
+apiRouter.get("/curriculum", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
   let list = [...state.curriculumGuidelines || []];
   if (!session) {
@@ -3922,10 +4027,16 @@ apiRouter.get("/curriculum/file/:filename", (req, res) => {
   const stream = fs.createReadStream(filePath);
   stream.pipe(res);
 });
-apiRouter.get("/history", (req, res) => {
+apiRouter.get("/history", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   const token = extractToken(req);
-  const session = db.validateSession(token);
+  let session;
+  try {
+    session = await db.validateSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const state = db.getState();
   let list = [...state.history || []];
   if (!session) {

@@ -21,7 +21,6 @@ import {
   SchoolFAQItem
 } from '../types';
 import { safeStorage, safeSessionStorage } from '../utils/storage';
-import { verifyPassword, loadAdminAccounts } from '../utils/security';
 import {
   getApiUrl,
   getApiBaseUrl,
@@ -410,34 +409,9 @@ class APIClient {
       }
 
       if (isHostNotFound) {
-        // Resilient fallback: verify credentials locally using authoritative bcrypt verification
-        try {
-          const accounts = loadAdminAccounts();
-          const trimmedUsername = payload.username.trim().toLowerCase();
-          const matched = accounts.find(
-            a => a.username.toLowerCase() === trimmedUsername || a.email.toLowerCase() === trimmedUsername
-          );
-          if (matched && payload.password && matched.status === 'active') {
-            const isValid = await verifyPassword(payload.password, matched.passwordHash, matched.salt);
-            if (isValid) {
-              const fallbackToken = 'auth_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-              this.setToken(fallbackToken);
-              return {
-                success: true,
-                token: fallbackToken,
-                account: matched,
-                sessionExpiresAt: Date.now() + 30 * 60 * 1000
-              };
-            }
-          }
-        } catch (fallbackErr) {
-          console.warn('[Auth Fallback]', fallbackErr);
-        }
-
-        // If credentials did not match, return standard invalid credentials error, NEVER "The page could not be found"
         return {
           success: false,
-          error: 'Invalid username or password.'
+          error: 'Authentication service is unavailable. Please try again later.'
         };
       }
 
@@ -471,33 +445,12 @@ class APIClient {
         method: 'POST',
         status: 'NETWORK_ERROR',
         message: networkErr?.message || 'Unable to connect to authentication server.',
-        details: 'Network request to /api/auth/login failed. Attempting offline fallback verification.',
+        details: 'Network request to /api/auth/login failed. Offline credential fallback is disabled.',
         requestPayloadSnippet: JSON.stringify({ username: payload.username })
       });
-      // Network error or fetch failed - try secure local verification
-      try {
-        const accounts = loadAdminAccounts();
-        const trimmedUsername = payload.username.trim().toLowerCase();
-        const matched = accounts.find(
-          a => a.username.toLowerCase() === trimmedUsername || a.email.toLowerCase() === trimmedUsername
-        );
-        if (matched && payload.password && matched.status === 'active') {
-          const isValid = await verifyPassword(payload.password, matched.passwordHash, matched.salt);
-          if (isValid) {
-            const fallbackToken = 'auth_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-            this.setToken(fallbackToken);
-            return {
-              success: true,
-              token: fallbackToken,
-              account: matched,
-              sessionExpiresAt: Date.now() + 30 * 60 * 1000
-            };
-          }
-        }
-      } catch {}
       return {
         success: false,
-        error: 'Invalid username or password.'
+        error: 'Unable to reach the authentication service. Check your connection and try again.'
       };
     }
   }
@@ -520,19 +473,8 @@ class APIClient {
         if (data && data.authenticated) return data;
       }
     } catch {
-      // Fall through to stored session check
+      return { authenticated: false };
     }
-
-    try {
-      const storedAccount = safeSessionStorage.getItem('ishwari_current_account');
-      const isAuth = safeSessionStorage.getItem('ishwari_admin_auth') === 'true';
-      if (isAuth && storedAccount) {
-        const parsed = JSON.parse(storedAccount);
-        if (parsed && parsed.id && parsed.username) {
-          return { authenticated: true, account: parsed };
-        }
-      }
-    } catch {}
 
     return { authenticated: false };
   }
