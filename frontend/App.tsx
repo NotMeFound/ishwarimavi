@@ -152,6 +152,7 @@ export default function App() {
 
   // 4. Search Modal State
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [hasLoadedAuthoritativeState, setHasLoadedAuthoritativeState] = useState(false);
 
   // 5. Managed School Data & Records (React UI State backed Authoritatively by Database API)
   const [school, setSchool] = useState<SchoolData>(initialSchoolData);
@@ -211,11 +212,15 @@ export default function App() {
       if (data.adminAccounts) setAdminAccounts(data.adminAccounts);
     };
 
-    apiClient.fetchAuthoritativeState().then((res) => {
-      if (res?.data) {
-        applyAuthoritativeData(res.data);
-      }
-    });
+    apiClient.fetchAuthoritativeState()
+      .then((res) => {
+        if (res?.data) {
+          applyAuthoritativeData(res.data);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setHasLoadedAuthoritativeState(true);
+      });
 
     const cleanupLiveSync = apiClient.setupLiveSync((data) => {
       applyAuthoritativeData(data);
@@ -545,6 +550,23 @@ export default function App() {
     window.addEventListener('pagehide', handlePageHide);
     return () => window.removeEventListener('pagehide', handlePageHide);
   }, [isAdminRoute]);
+
+  if (!hasLoadedAuthoritativeState) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1E3A8A] dark:border-slate-700 dark:border-t-blue-400" />
+          <span className="text-sm font-medium">
+            {lang === 'np' ? 'नवीनतम विद्यालय जानकारी लोड हुँदैछ...' : 'Loading the latest school information...'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   // When on Admin Route, isolate the view completely (no public header, footer, or search modal)
   if (isAdminRoute) {
