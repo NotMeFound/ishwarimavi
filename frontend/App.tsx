@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { GraduationCap, Sparkles } from 'lucide-react';
 import {
   Language,
   ThemeMode,
@@ -153,6 +154,15 @@ export default function App() {
   // 4. Search Modal State
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [hasLoadedAuthoritativeState, setHasLoadedAuthoritativeState] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
+  useEffect(() => {
+    if (hasLoadedAuthoritativeState) return;
+    const messageTimer = window.setInterval(() => {
+      setLoadingMessageIndex((index) => (index + 1) % 3);
+    }, 2400);
+    return () => window.clearInterval(messageTimer);
+  }, [hasLoadedAuthoritativeState]);
 
   // 5. Managed School Data & Records (React UI State backed Authoritatively by Database API)
   const [school, setSchool] = useState<SchoolData>(initialSchoolData);
@@ -552,18 +562,79 @@ export default function App() {
   }, [isAdminRoute]);
 
   if (!hasLoadedAuthoritativeState) {
+    const loadingMessages = lang === 'np'
+      ? ['नवीनतम विद्यालय जानकारी ल्याउँदैछौँ', 'विद्यालयका स्रोतहरू तयार गर्दैछौँ', 'तपाईंको पोर्टल तयार हुँदैछ']
+      : ['Fetching the latest school information', 'Preparing school resources', 'Getting your portal ready'];
+
     return (
       <div
-        className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200"
+        className="relative min-h-screen overflow-hidden flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 px-5"
         role="status"
         aria-live="polite"
       >
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1E3A8A] dark:border-slate-700 dark:border-t-blue-400" />
-          <span className="text-sm font-medium">
-            {lang === 'np' ? 'नवीनतम विद्यालय जानकारी लोड हुँदैछ...' : 'Loading the latest school information...'}
-          </span>
-        </div>
+        <div className="absolute -top-40 -left-32 h-96 w-96 rounded-full bg-blue-400/10 blur-3xl dark:bg-blue-500/10" />
+        <div className="absolute -bottom-48 -right-24 h-[30rem] w-[30rem] rounded-full bg-amber-300/15 blur-3xl dark:bg-indigo-500/10" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-8 text-center shadow-[0_24px_80px_-32px_rgba(30,58,138,0.35)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/75 sm:p-10"
+        >
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent" />
+          <div className="relative mx-auto mb-7 flex h-28 w-28 items-center justify-center">
+            <div className="absolute inset-1 rounded-full border border-blue-200/70 dark:border-blue-900/70" />
+            <div className="absolute inset-1 animate-spin rounded-full border-2 border-transparent border-t-blue-500 motion-reduce:animate-none" />
+            <div className="absolute inset-3 animate-[spin_4s_linear_infinite_reverse] rounded-full border border-dashed border-amber-400/70 motion-reduce:animate-none" />
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl bg-linear-to-br from-[#1E3A8A] via-[#1E40AF] to-[#0F172A] text-amber-300 shadow-lg shadow-blue-900/20"
+            >
+              <GraduationCap className="h-9 w-9" strokeWidth={1.7} aria-hidden="true" />
+            </motion.div>
+            <Sparkles className="absolute right-0 top-3 h-4 w-4 text-amber-500" aria-hidden="true" />
+            <Sparkles className="absolute bottom-2 left-0 h-3.5 w-3.5 text-blue-500/70" aria-hidden="true" />
+          </div>
+
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
+            {lang === 'np' ? 'श्री ईश्वरी माध्यमिक विद्यालय' : 'Shree Ishwari Secondary School'}
+          </p>
+          <h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            {lang === 'np' ? 'स्वागत छ' : 'Welcome'}
+          </h1>
+          <div className="mt-5 flex min-h-6 items-center justify-center gap-2" aria-live="polite">
+            <motion.span
+              key={loadingMessageIndex}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-sm font-medium text-slate-600 dark:text-slate-300"
+            >
+              {loadingMessages[loadingMessageIndex]}
+            </motion.span>
+            <span className="flex gap-1" aria-hidden="true">
+              {[0, 1, 2].map((dot) => (
+                <motion.span
+                  key={dot}
+                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                  transition={{ duration: 0.9, repeat: Infinity, delay: dot * 0.16 }}
+                  className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400"
+                />
+              ))}
+            </span>
+          </div>
+
+          <div className="mt-7 h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-slate-800" aria-hidden="true">
+            <motion.div
+              className="h-full w-1/3 rounded-full bg-linear-to-r from-blue-700 via-blue-500 to-amber-400"
+              animate={{ x: ['-100%', '300%'] }}
+              transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </div>
+          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+            {lang === 'np' ? 'केही क्षण पर्खनुहोस्' : 'Just a few moments'}
+          </p>
+        </motion.div>
       </div>
     );
   }

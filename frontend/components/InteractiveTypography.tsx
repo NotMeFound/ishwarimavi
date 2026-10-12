@@ -426,7 +426,7 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
 
 /**
  * 5. TYPOGRAPHIC BACKGROUND ELEMENT
- * Very large, low-contrast typography behind selected sections (e.g. "ISHWARI", "ESTD 2035", "EXCELLENCE").
+ * Very large, low-contrast typography behind selected sections (e.g. "ISHWARI", "ESTD 2028", "EXCELLENCE").
  * Requirements:
  * - Very low visual contrast (opacity 0.03 - 0.06 in light mode, 0.03 - 0.05 in dark mode)
  * - Must not interfere with content (pointer-events-none, absolute z-0, select-none)
@@ -807,7 +807,6 @@ export const InteractiveTitle = InteractiveSectionHeading;
 export const ScrollRevealInteractiveHeading = InteractiveSectionHeading;
 export const InteractiveBrandHeading = InteractiveCharacterHeading;
 export const InteractiveBrandText = InteractiveCharacterHeading;
-
 
 
 

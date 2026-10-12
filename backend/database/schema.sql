@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `site_settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `site_settings` (`id`, `school_name_en`, `school_name_np`, `phone`, `email`, `address_en`, `address_np`, `principal_name_en`, `principal_name_np`, `principal_message_en`, `principal_message_np`) VALUES
-(1, 'Ishwari Secondary School', 'ईश्वरी माध्यमिक विद्यालय', '+977-01-5542109', 'info@ishwari.edu.np', 'Ward No. 4, Nepal', 'वडा नं. ४, नेपाल', 'Mr. Narayan Prasad Koirala', 'श्री नारायण प्रसाद कोइराला', 'Welcome to Ishwari Secondary School, dedicated to holistic education, scientific inquiry, and character development.', 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक पोर्टलमा हार्दिक स्वागत छ। गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षामा हाम्रो प्रतिबद्धता।');
+(1, 'Ishwari Secondary School', 'ईश्वरी माध्यमिक विद्यालय', '+977-01-5542109', 'info@ishwari.edu.np', 'Ward No. 4, Nepal', 'वडा नं. ४, नेपाल', 'Mangal Khatri', 'मंगल खत्री', 'Welcome to Ishwari Secondary School, dedicated to holistic education, scientific inquiry, and character development.', 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक पोर्टलमा हार्दिक स्वागत छ। गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षामा हाम्रो प्रतिबद्धता।');
 
 -- 2. Notices Table
 CREATE TABLE IF NOT EXISTS `notices` (
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS `staff` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `staff` (`id`, `name_en`, `name_np`, `role`, `designation_en`, `designation_np`, `experience`, `display_order`) VALUES
-(1, 'Mr. Narayan Prasad Koirala', 'श्री नारायण प्रसाद कोइराला', 'principal', 'Headmaster (M.Ed, M.A.)', 'प्रधानाध्यापक', '26 Years Experience', 1),
-(2, 'Mrs. Sharada Devi Sharma', 'श्रीमती शारदा देवी शर्मा', 'teacher', 'Senior Science Lead (M.Sc)', 'वरिष्ठ विज्ञान संयोजक', '18 Years Experience', 2);
+(1, 'Mangal Khatri', 'मंगल खत्री', 'principal', 'Principal', 'प्रधानाध्यापक', NULL, 1),
+(2, 'Bhim Bahadur Khatri', 'भीम बहादुर खत्री', 'teacher', 'Social Studies Teacher', 'सामाजिक अध्ययन शिक्षक', NULL, 2);
 
 -- 4. Admin Users Table
 CREATE TABLE IF NOT EXISTS `admin_users` (

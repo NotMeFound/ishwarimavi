@@ -487,7 +487,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'achievements', labelEn: 'Achievements', labelNp: 'उपलब्धिहरू', icon: Award, badge: '★', badgeColor: 'bg-amber-600', descEn: 'Awards & Honors', descNp: 'विद्यालयका गौरवमय सफलता' },
     { id: 'documents', labelEn: 'Downloads Center', labelNp: 'कागजात तथा डाउनलोड', icon: Download, descEn: 'Forms, Charter & Reports', descNp: 'फारम, नागरिक वडापत्र र प्रतिवेदन' },
     { id: 'gallery', labelEn: 'Photo Gallery', labelNp: 'तस्बिर ग्यालरी', icon: Image, descEn: 'Campus Activities', descNp: 'कार्यक्रम तथा क्रियाकलाप' },
-    { id: 'history', labelEn: 'School History', labelNp: 'ऐतिहासिक पृष्ठभूमि', icon: BookOpen, descEn: 'Since 2035 BS', descNp: 'वि.सं. २०३५ देखिको यात्रा' },
+    { id: 'history', labelEn: 'School History', labelNp: 'ऐतिहासिक पृष्ठभूमि', icon: BookOpen, descEn: 'Since 2028 BS', descNp: 'वि.सं. २०२८ देखिको यात्रा' },
   ];
 
   const isMoreActive = moreNavItems.some(item => item.id === activeRoute);
@@ -1207,4 +1207,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

@@ -428,20 +428,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'ishwari_active_session_lock') {
-        if (!e.newValue && isAuthenticated) {
-          apiClient.setToken(null);
-          setIsAuthenticated(false);
-          setCurrentAccount(null);
-          safeSessionStorage.removeItem('ishwari_admin_auth');
-          safeSessionStorage.removeItem('ishwari_current_account');
-          safeSessionStorage.removeItem('ishwari_my_session_id');
-          setAuthError(
-            lang === 'np'
-              ? 'प्रशासनिक सत्र लगआउट गरिएको छ।'
-              : 'The administrative session was logged out.'
-          );
-        }
+      if (e.key === 'ishwari_server_token') {
+        apiClient.setToken(e.newValue);
+      }
+
+      if (e.key === 'ishwari_active_session_lock' && !e.newValue && isAuthenticated) {
+        apiClient.setToken(null);
+        setIsAuthenticated(false);
+        setCurrentAccount(null);
+        safeSessionStorage.removeItem('ishwari_admin_auth');
+        safeSessionStorage.removeItem('ishwari_current_account');
+        safeSessionStorage.removeItem('ishwari_my_session_id');
+        setAuthError(
+          lang === 'np'
+            ? 'प्रशासनिक सत्र लगआउट गरिएको छ।'
+            : 'The administrative session was logged out.'
+        );
       }
     };
     window.addEventListener('storage', handleStorage);

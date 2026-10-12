@@ -11,8 +11,8 @@ namespace Backend\Config;
 define('SITE_NAME_EN', 'Ishwari Secondary School');
 define('SITE_NAME_NP', 'ईश्वरी माध्यमिक विद्यालय');
 define('SITE_CODE', 'EMIS: 48012004');
-define('ESTD_BS', '2035 B.S.');
-define('ESTD_AD', '1978 A.D.');
+define('ESTD_BS', '2028 B.S.');
+define('ESTD_AD', '');
 
 // Database Configuration
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');

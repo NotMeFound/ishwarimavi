@@ -98,7 +98,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     { route: 'facilities', title_en: 'Campus Infrastructure & Laboratory', title_np: 'विद्यालयका भौतिक पूर्वाधार तथा प्रयोगशाला', keywords: 'facilities lab science computer library playground hostel' },
     { route: 'staff', title_en: 'Faculty & Administrative Staff Directory', title_np: 'शिक्षक तथा कर्मचारी विवरण', keywords: 'teachers faculty principal administration staff educators' },
     { route: 'notices', title_en: 'Official Notice Board & Circulars', title_np: 'आधिकारिक सूचना पाटी तथा परिपत्र', keywords: 'notices circulars announcements circular board exam' },
-    { route: 'history', title_en: 'Chronicle of Milestones & Heritage', title_np: 'ऐतिहासिक कालखण्ड तथा कोसेढुङ्गा', keywords: 'history timeline heritage 2035 founders' },
+    { route: 'history', title_en: 'Chronicle of Milestones & Heritage', title_np: 'ऐतिहासिक कालखण्ड तथा कोसेढुङ्गा', keywords: 'history timeline heritage 2028 founders' },
     { route: 'curriculum', title_en: 'National Curriculum Guidelines & Syllabus', title_np: 'राष्ट्रिय पाठ्यक्रम निर्देशिका तथा पाठ्यसामग्री', keywords: 'curriculum guidelines syllabus books downloads' },
     { route: 'documents', title_en: 'Institutional Documents & Citizen Charter', title_np: 'कागजात, नागरिक वडापत्र तथा डाउनलोड', keywords: 'documents citizen charter forms circulars' },
     { route: 'gallery', title_en: 'School Photo & Activities Gallery', title_np: 'फोटो तथा गतिविधि ग्यालरी', keywords: 'gallery photos events campus pictures' },

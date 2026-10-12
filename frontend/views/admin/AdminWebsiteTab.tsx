@@ -1201,7 +1201,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                     type="text"
                     value={schoolForm.estd_bs}
                     onChange={e => setSchoolForm({ ...schoolForm, estd_bs: e.target.value })}
-                    placeholder="e.g. 2035 B.S."
+                    placeholder="e.g. 2028 B.S."
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-[#1E40AF]"
                   />
                 </div>
@@ -1213,7 +1213,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                     type="text"
                     value={schoolForm.estd_ad}
                     onChange={e => setSchoolForm({ ...schoolForm, estd_ad: e.target.value })}
-                    placeholder="e.g. 1978"
+                    placeholder="Optional A.D. year"
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-[#1E40AF]"
                   />
                 </div>
@@ -4524,7 +4524,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                   rows={2}
                   value={siteForm.footerDescEn || ''}
                   onChange={e => setSiteForm({ ...siteForm, footerDescEn: e.target.value })}
-                  placeholder="Committed to excellence, integrity, and social responsibility in public secondary education since 2035 B.S."
+                  placeholder="Committed to excellence, integrity, and social responsibility in public secondary education since 2028 B.S."
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
                 />
               </div>

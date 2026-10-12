@@ -115,9 +115,9 @@ export function AboutView({
                 </>
               )}
 
-              {/* Typographic Ambient Background: ESTD 2035 */}
+              {/* Typographic Ambient Background: ESTD 2028 */}
               <TypographicBackground
-                text="ESTD 2035"
+                text="ESTD 2028"
                 position="top-right"
                 align="right"
                 opacityClass="text-slate-900/[0.025] dark:text-white/[0.02]"
@@ -150,8 +150,8 @@ export function AboutView({
                   ) : (
                     <BlurSharpStatement as="p" className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
                       {t(
-                        'A landmark community institution dedicated to democratic, inclusive, and scientific secondary education since 2035 B.S.',
-                        'वि.सं. २०३५ मा स्थापित यस विद्यालयले गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षा प्रदान गर्दै आइरहेको छ।'
+                        'A landmark community institution dedicated to democratic, inclusive, and scientific secondary education since 2028 B.S.',
+                        'वि.सं. २०२८ मा स्थापित यस विद्यालयले गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षा प्रदान गर्दै आइरहेको छ।'
                       )}
                     </BlurSharpStatement>
                   )}
@@ -446,4 +446,3 @@ export function AboutView({
 };
 
 export default AboutView;
-

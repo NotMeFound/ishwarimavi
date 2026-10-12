@@ -42,21 +42,25 @@ var initialSchoolData = {
   affiliation_en: "National Examination Board (NEB) Affiliated Model Community School",
   affiliation_np: "\u0930\u093E\u0937\u094D\u091F\u094D\u0930\u093F\u092F \u092A\u0930\u0940\u0915\u094D\u0937\u093E \u092C\u094B\u0930\u094D\u0921 (NEB) \u0938\u092E\u094D\u092C\u0928\u094D\u0927\u0928 \u092A\u094D\u0930\u093E\u092A\u094D\u0924 \u0928\u092E\u0941\u0928\u093E \u0938\u093E\u092E\u0941\u0926\u093E\u092F\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F",
   code: "EMIS: 48012004",
-  estd_bs: "2035 B.S.",
-  estd_ad: "1978 A.D.",
+  estd_bs: "2028 B.S.",
+  estd_ad: "",
   phone: "+977-081-560123 / 9858012345",
   email: "info@ishwari.edu.np",
   address_en: "Baijanath Rural Municipality - 5, Banke, Lumbini Province, Nepal",
   address_np: "\u092C\u0948\u091C\u0928\u093E\u0925 \u0917\u093E\u0909\u0901\u092A\u093E\u0932\u093F\u0915\u093E \u0935\u0921\u093E \u0928\u0902. \u096B, \u092C\u093E\u0901\u0915\u0947, \u0932\u0941\u092E\u094D\u092C\u093F\u0928\u0940 \u092A\u094D\u0930\u0926\u0947\u0936, \u0928\u0947\u092A\u093E\u0932",
   map_embed_url: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d112450.47271926677!2d81.6033324!3d28.2166667!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3998650000000001%3A0x0!2sBaijanath%2C%20Banke!5e0!3m2!1sen!2snp!4v1620000000000!5m2!1sen!2snp",
   map_url: "https://maps.google.com/?q=Shree+Ishwari+Secondary+School+Baijanath+5+Banke+Nepal",
-  principal_name_en: "Mr. Narayan Prasad Koirala",
-  principal_name_np: "\u0936\u094D\u0930\u0940 \u0928\u093E\u0930\u093E\u092F\u0923 \u092A\u094D\u0930\u0938\u093E\u0926 \u0915\u094B\u0907\u0930\u093E\u0932\u093E",
+  chairman_name_en: "Jhakabir Khatri",
+  chairman_name_np: "\u091D\u0915\u092C\u093F\u0930 \u0916\u0924\u094D\u0930\u0940",
+  chairman_designation_en: "Chairman, School Management Committee",
+  chairman_designation_np: "\u0905\u0927\u094D\u092F\u0915\u094D\u0937, \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093E\u092A\u0928 \u0938\u092E\u093F\u0924\u093F",
+  principal_name_en: "Mangal Khatri",
+  principal_name_np: "\u092E\u0902\u0917\u0932 \u0916\u0924\u094D\u0930\u0940",
   principal_designation_en: "Headmaster / Principal (M.Ed, M.A.)",
   principal_designation_np: "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915",
   principal_image: "",
-  principal_message_en: "Welcome to Shree Ishwari Secondary School, Baijanath-5, Banke. For over four decades, our institution has stood as a beacon of quality community education in Banke district, blending modern curriculum with values of integrity and societal leadership.",
-  principal_message_np: "\u0936\u094D\u0930\u0940 \u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F, \u092C\u0948\u091C\u0928\u093E\u0925-\u096B, \u092C\u093E\u0901\u0915\u0947\u0915\u094B \u0906\u0927\u093F\u0915\u093E\u0930\u093F\u0915 \u0921\u093F\u091C\u093F\u091F\u0932 \u092A\u094B\u0930\u094D\u091F\u0932\u092E\u093E \u092F\u0939\u093E\u0901\u0939\u0930\u0942\u0932\u093E\u0908 \u0939\u093E\u0930\u094D\u0926\u093F\u0915 \u0938\u094D\u0935\u093E\u0917\u0924 \u091B\u0964 \u0935\u093F.\u0938\u0902. \u0968\u0966\u0969\u096B \u0938\u093E\u0932\u0926\u0947\u0916\u093F \u092F\u0938 \u092D\u0947\u0917\u0915\u0948 \u0905\u0917\u094D\u0930\u0923\u0940 \u0938\u093E\u092E\u0941\u0926\u093E\u092F\u093F\u0915 \u0928\u092E\u0941\u0928\u093E \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u0930\u0942\u092A\u092E\u093E \u0939\u093E\u092E\u0940\u0932\u0947 \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940\u0939\u0930\u0942\u0915\u094B \u091A\u094C\u0924\u0930\u094D\u092B\u0940 \u092C\u094C\u0926\u094D\u0927\u093F\u0915, \u092A\u094D\u0930\u093E\u0935\u093F\u0927\u093F\u0915 \u0930 \u0928\u0948\u0924\u093F\u0915 \u0935\u093F\u0915\u093E\u0938\u092E\u093E \u091C\u094B\u0921 \u0926\u093F\u0901\u0926\u0948 \u0906\u090F\u0915\u093E \u091B\u094C\u0902\u0964",
+  principal_message_en: "Welcome to Shree Ishwari Secondary School, Baijanath-5, Banke. We are committed to supporting student learning and development.",
+  principal_message_np: "\u0936\u094D\u0930\u0940 \u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F, \u092C\u0948\u091C\u0928\u093E\u0925-\u096B, \u092C\u093E\u0901\u0915\u0947\u0915\u094B \u0906\u0927\u093F\u0915\u093E\u0930\u093F\u0915 \u0921\u093F\u091C\u093F\u091F\u0932 \u092A\u094B\u0930\u094D\u091F\u0932\u092E\u093E \u0939\u093E\u0930\u094D\u0926\u093F\u0915 \u0938\u094D\u0935\u093E\u0917\u0924 \u091B\u0964 \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940\u0939\u0930\u0942\u0915\u094B \u0938\u093F\u0915\u093E\u0907 \u0930 \u0938\u0930\u094D\u0935\u093E\u0919\u094D\u0917\u0940\u0923 \u0935\u093F\u0915\u093E\u0938\u092E\u093E \u0939\u093E\u092E\u0940 \u092A\u094D\u0930\u0924\u093F\u092C\u0926\u094D\u0927 \u091B\u094C\u0902\u0964",
   home_bg_image: "",
   home_bg_enabled: false
 };
@@ -101,39 +105,21 @@ var initialNotices = [
 var initialStaff = [
   {
     id: 1,
-    name_en: "Mr. Narayan Prasad Koirala",
-    name_np: "\u0936\u094D\u0930\u0940 \u0928\u093E\u0930\u093E\u092F\u0923 \u092A\u094D\u0930\u0938\u093E\u0926 \u0915\u094B\u0907\u0930\u093E\u0932\u093E",
+    name_en: "Mangal Khatri",
+    name_np: "\u092E\u0902\u0917\u0932 \u0916\u0924\u094D\u0930\u0940",
     role: "principal",
-    designation_en: "Headmaster / Principal (M.Ed, M.A.)",
-    designation_np: "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915 (\u090F\u092E.\u090F\u0921, \u090F\u092E.\u090F.)",
-    experience: "26 Years in Educational Leadership"
+    designation_en: "Principal",
+    designation_np: "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915",
+    experience: ""
   },
   {
     id: 2,
-    name_en: "Mrs. Sharada Devi Sharma",
-    name_np: "\u0936\u094D\u0930\u0940\u092E\u0924\u0940 \u0936\u093E\u0930\u0926\u093E \u0926\u0947\u0935\u0940 \u0936\u0930\u094D\u092E\u093E",
+    name_en: "Bhim Bahadur Khatri",
+    name_np: "\u092D\u0940\u092E \u092C\u0939\u093E\u0926\u0941\u0930 \u0916\u0924\u094D\u0930\u0940",
     role: "teacher",
-    designation_en: "Senior Science Coordinator (M.Sc. Physics)",
-    designation_np: "\u0935\u0930\u093F\u0937\u094D\u0920 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0938\u0902\u092F\u094B\u091C\u0915 (\u090F\u092E.\u090F\u0938\u0938\u0940.)",
-    experience: "18 Years Experience"
-  },
-  {
-    id: 3,
-    name_en: "Mr. Rameshwor Gautam",
-    name_np: "\u0936\u094D\u0930\u0940 \u0930\u093E\u092E\u0947\u0936\u094D\u0935\u0930 \u0917\u094C\u0924\u092E",
-    role: "teacher",
-    designation_en: "Head of Mathematics (M.Sc. Mathematics)",
-    designation_np: "\u0917\u0923\u093F\u0924 \u0935\u093F\u092D\u093E\u0917 \u092A\u094D\u0930\u092E\u0941\u0916 (\u090F\u092E.\u090F\u0938\u0938\u0940.)",
-    experience: "21 Years Experience"
-  },
-  {
-    id: 4,
-    name_en: "Ms. Binita Thapa",
-    name_np: "\u0938\u0941\u0936\u094D\u0930\u0940 \u092C\u093F\u0928\u093F\u0924\u093E \u0925\u093E\u092A\u093E",
-    role: "teacher",
-    designation_en: "ICT & Computer Science Lead (B.Sc. CSIT)",
-    designation_np: "\u0915\u092E\u094D\u092A\u094D\u092F\u0941\u091F\u0930 \u0924\u0925\u093E \u0938\u0942\u091A\u0928\u093E \u092A\u094D\u0930\u0935\u093F\u0927\u093F \u0935\u093F\u092D\u093E\u0917 \u092A\u094D\u0930\u092E\u0941\u0916",
-    experience: "8 Years Experience"
+    designation_en: "Social Studies Teacher",
+    designation_np: "\u0938\u093E\u092E\u093E\u091C\u093F\u0915 \u0905\u0927\u094D\u092F\u092F\u0928 \u0936\u093F\u0915\u094D\u0937\u0915",
+    experience: ""
   }
 ];
 var initialFacilities = [
@@ -217,7 +203,7 @@ var initialAchievements = [
 var initialHistory = [
   {
     id: 1,
-    year: "2035 B.S. (1978 A.D.)",
+    year: "2028 B.S.",
     title_en: "Founding as Community Primary School",
     title_np: "\u092A\u094D\u0930\u093E\u0925\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u0930\u0942\u092A\u092E\u093E \u0938\u094D\u0925\u093E\u092A\u0928\u093E",
     desc_en: "Inaugurated through community patronage to provide accessible education to rural youths with thatch roofing and dedicated local educators.",
@@ -444,8 +430,8 @@ var initialSiteConfig = {
   alertTickerNp: "\u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0938\u0924\u094D\u0930 \u0968\u0966\u096E\u0969 \u0915\u094B \u0935\u093E\u0930\u094D\u0937\u093F\u0915 \u092A\u0930\u0940\u0915\u094D\u0937\u093E \u0924\u093E\u0932\u093F\u0915\u093E (\u0915\u0915\u094D\u0937\u093E \u0967 \u0926\u0947\u0916\u093F \u096F \u0938\u092E\u094D\u092E) \u092A\u094D\u0930\u0915\u093E\u0936\u093F\u0924 \u0917\u0930\u093F\u090F\u0915\u094B \u092C\u093E\u0930\u0947",
   heroBadgeEn: "CENTER FOR ACADEMIC EXCELLENCE & CHARACTER BUILDING",
   heroBadgeNp: "\u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E \u0930 \u091A\u0930\u093F\u0924\u094D\u0930 \u0928\u093F\u0930\u094D\u092E\u093E\u0923\u0915\u094B \u0915\u0947\u0928\u094D\u0926\u094D\u0930",
-  heroTitleEn: "Cultivating Academic Excellence & Responsible Citizens Since 2035 B.S.",
-  heroTitleNp: "\u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E \u0930 \u0928\u0948\u0924\u093F\u0915 \u091A\u0930\u093F\u0924\u094D\u0930 \u0928\u093F\u0930\u094D\u092E\u093E\u0923\u0915\u094B \u091A\u093E\u0930 \u0926\u0936\u0915 \u0932\u093E\u092E\u094B \u092F\u093E\u0924\u094D\u0930\u093E\u0964",
+  heroTitleEn: "Cultivating Academic Excellence & Responsible Citizens Since 2028 B.S.",
+  heroTitleNp: "\u0935\u093F.\u0938\u0902. \u0968\u0966\u0968\u096E \u0926\u0947\u0916\u093F \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E \u0930 \u0928\u0948\u0924\u093F\u0915 \u091A\u0930\u093F\u0924\u094D\u0930 \u0928\u093F\u0930\u094D\u092E\u093E\u0923\u092E\u093E \u0938\u092E\u0930\u094D\u092A\u093F\u0924\u0964",
   heroSubtitleEn: "A premier community educational institution offering experiential STEM pedagogy, digital classrooms, high-standard laboratories, and holistic secondary and higher secondary education.",
   heroSubtitleNp: "\u0905\u0928\u0941\u092D\u0935\u0940 \u0936\u093F\u0915\u094D\u0937\u0915, \u0906\u0927\u0941\u0928\u093F\u0915 \u0935\u093F\u091C\u094D\u091E\u093E\u0928 \u0924\u0925\u093E \u0915\u092E\u094D\u092A\u094D\u092F\u0941\u091F\u0930 \u092A\u094D\u0930\u092F\u094B\u0917\u0936\u093E\u0932\u093E \u0930 \u0921\u093F\u091C\u093F\u091F\u0932 \u0938\u094D\u092E\u093E\u0930\u094D\u091F \u0915\u0915\u094D\u0937\u093E\u0915\u094B\u0920\u093E\u0915\u093E \u092E\u093E\u0927\u094D\u092F\u092E\u092C\u093E\u091F \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940\u0939\u0930\u0942\u0915\u094B \u091A\u094C\u0924\u0930\u094D\u092B\u0940 \u0935\u093F\u0915\u093E\u0938\u092E\u093E \u0938\u092E\u0930\u094D\u092A\u093F\u0924\u0964",
   homeBgImage: "",
@@ -467,9 +453,9 @@ var initialSiteConfig = {
     staff: "52",
     staffLabelEn: "Faculty & Staff",
     staffLabelNp: "\u0936\u093F\u0915\u094D\u0937\u0915 \u0924\u0925\u093E \u0915\u0930\u094D\u092E\u091A\u093E\u0930\u0940",
-    years: "48",
-    yearsLabelEn: "Years of Service",
-    yearsLabelNp: "\u0935\u0930\u094D\u0937\u0915\u094B \u0917\u094C\u0930\u0935\u092E\u092F \u0907\u0924\u093F\u0939\u093E\u0938",
+    years: "2028 B.S.",
+    yearsLabelEn: "Established",
+    yearsLabelNp: "\u0938\u094D\u0925\u093E\u092A\u0928\u093E",
     successRate: "100%",
     successLabelEn: "SEE Success Rate",
     successLabelNp: "\u090F\u0938\u0908\u0908 \u092A\u0930\u0940\u0915\u094D\u0937\u093E \u0938\u092B\u0932\u0924\u093E"
@@ -489,7 +475,7 @@ var initialSiteConfig = {
     community: true,
     contact: true
   },
-  footerDescEn: "Committed to excellence, integrity, and social responsibility in public secondary education since 2035 B.S.",
+  footerDescEn: "Committed to excellence, integrity, and social responsibility in public secondary education since 2028 B.S.",
   footerDescNp: "\u0935\u093F.\u0938\u0902. \u0968\u0966\u0969\u096B \u0926\u0947\u0916\u093F \u0917\u0941\u0923\u0938\u094D\u0924\u0930\u0940\u092F, \u092A\u094D\u0930\u0935\u093F\u0927\u093F\u092E\u0948\u0924\u094D\u0930\u0940 \u0930 \u0928\u0948\u0924\u093F\u0915 \u0936\u093F\u0915\u094D\u0937\u093E \u092A\u094D\u0930\u0926\u093E\u0928 \u0917\u0930\u094D\u0926\u0948 \u0906\u0907\u0930\u0939\u0947\u0915\u094B \u0905\u0917\u094D\u0930\u0923\u0940 \u0928\u092E\u0941\u0928\u093E \u0938\u093E\u092E\u0941\u0926\u093E\u092F\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0964",
   copyrightTextEn: "Ishwari Secondary School. All rights reserved.",
   copyrightTextNp: "\u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0964 \u0938\u0930\u094D\u0935\u093E\u0927\u093F\u0915\u093E\u0930 \u0938\u0941\u0930\u0915\u094D\u0937\u093F\u0924\u0964",
@@ -684,8 +670,8 @@ var initialSiteConfig = {
       id: "about",
       nameEn: "About School & Educational Pillars",
       nameNp: "\u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u092A\u0930\u093F\u091A\u092F \u0924\u0925\u093E \u0938\u094D\u0924\u092E\u094D\u092D\u0939\u0930\u0942",
-      title_en: "Four Decades of Academic Distinction",
-      title_np: "\u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E\u0915\u094B \u091A\u093E\u0930 \u0926\u0936\u0915 \u0932\u093E\u092E\u094B \u092F\u093E\u0924\u094D\u0930\u093E",
+      title_en: "A Legacy of Academic Distinction",
+      title_np: "\u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E\u0915\u094B \u0917\u094C\u0930\u0935\u092E\u092F \u092F\u093E\u0924\u094D\u0930\u093E",
       subtitle_en: "Dedicated to moral character, modern pedagogy, and equal learning opportunity.",
       subtitle_np: "\u0928\u0948\u0924\u093F\u0915 \u091A\u0930\u093F\u0924\u094D\u0930, \u0906\u0927\u0941\u0928\u093F\u0915 \u0936\u093F\u0915\u094D\u0937\u0923 \u0930 \u0938\u092E\u093E\u0928 \u0905\u0935\u0938\u0930\u092E\u093E \u0938\u092E\u0930\u094D\u092A\u093F\u0924\u0964",
       enabled: true,
@@ -1871,14 +1857,14 @@ var defaultAboutSections = [
     title_en: "About Ishwari Secondary School",
     title_np: "\u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u092C\u093E\u0930\u0947\u092E\u093E",
     category: "overview",
-    content_en: `Shree Ishwari Secondary School was established in 2035 B.S. and has continued to provide quality, accessible education to students across the community.
+    content_en: `Shree Ishwari Secondary School was established in 2028 B.S. and has continued to provide quality, accessible education to students across the community.
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:Main School Academic Block|caption:Shree Ishwari Secondary School Academic Campus Block]]
 
 Over the decades, the institution has steadily expanded its educational programs, infrastructure, and learning environment. Through generous community collaboration and dedicated governmental support, the school has developed modern multimedia classrooms, fully-equipped science and computer laboratories, and sports grounds.
 
 Today, Ishwari Secondary School stands as a model community learning center where academic rigor, ethical discipline, and scientific inquiry are nurtured together.`,
-    content_np: `\u0936\u094D\u0930\u0940 \u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0935\u093F.\u0938\u0902. \u0968\u0966\u0969\u096B \u0938\u093E\u0932\u092E\u093E \u0938\u094D\u0925\u093E\u092A\u093F\u0924 \u092D\u0908 \u092F\u0938 \u092D\u0947\u0917\u0915\u093E \u092C\u093E\u0932\u092C\u093E\u0932\u093F\u0915\u093E\u0939\u0930\u0942\u0932\u093E\u0908 \u0917\u0941\u0923\u0938\u094D\u0924\u0930\u0940\u092F, \u0938\u0941\u0932\u092D \u0930 \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0936\u093F\u0915\u094D\u0937\u093E \u092A\u094D\u0930\u0926\u093E\u0928 \u0917\u0930\u094D\u0926\u0948 \u0906\u0907\u0930\u0939\u0947\u0915\u094B \u090F\u0915 \u0910\u0924\u093F\u0939\u093E\u0938\u093F\u0915 \u0938\u093E\u092E\u0941\u0926\u093E\u092F\u093F\u0915 \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0938\u0902\u0938\u094D\u0925\u093E \u0939\u094B\u0964
+    content_np: `\u0936\u094D\u0930\u0940 \u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0935\u093F.\u0938\u0902. \u0968\u0966\u0968\u096E \u0938\u093E\u0932\u092E\u093E \u0938\u094D\u0925\u093E\u092A\u093F\u0924 \u092D\u0908 \u092F\u0938 \u092D\u0947\u0917\u0915\u093E \u092C\u093E\u0932\u092C\u093E\u0932\u093F\u0915\u093E\u0939\u0930\u0942\u0932\u093E\u0908 \u0917\u0941\u0923\u0938\u094D\u0924\u0930\u0940\u092F, \u0938\u0941\u0932\u092D \u0930 \u0935\u094D\u092F\u093E\u0935\u0939\u093E\u0930\u093F\u0915 \u0936\u093F\u0915\u094D\u0937\u093E \u092A\u094D\u0930\u0926\u093E\u0928 \u0917\u0930\u094D\u0926\u0948 \u0906\u0907\u0930\u0939\u0947\u0915\u094B \u090F\u0915 \u0910\u0924\u093F\u0939\u093E\u0938\u093F\u0915 \u0938\u093E\u092E\u0941\u0926\u093E\u092F\u093F\u0915 \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0938\u0902\u0938\u094D\u0925\u093E \u0939\u094B\u0964
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:\u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u092E\u0941\u0916\u094D\u092F \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u092D\u0935\u0928|caption:\u0936\u094D\u0930\u0940 \u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u092A\u0930\u093F\u0938\u0930]]
 
@@ -2050,6 +2036,107 @@ var CMS_MODULE_KEYS = [
   "auditLogs",
   "adminAccounts"
 ];
+var outdatedSeedStaffNames = /* @__PURE__ */ new Set([
+  "Mr. Narayan Prasad Koirala",
+  "Mrs. Sharada Devi Sharma",
+  "Mr. Rameshwor Gautam",
+  "Ms. Binita Thapa",
+  "Mr. Lokendra Bahadur Thapa",
+  "Ms. Kamala Adhikari"
+]);
+var SCHOOL_FACTS_MIGRATION_VERSION = "school-facts-2028-v1";
+function migrateSchoolFacts(state) {
+  const changedModules = /* @__PURE__ */ new Set();
+  const school = state.school;
+  const setSchoolValue = (key, value) => {
+    if (school[key] !== value) {
+      school[key] = value;
+      changedModules.add("school");
+    }
+  };
+  if (school.estd_bs === "2035 B.S.") setSchoolValue("estd_bs", "2028 B.S.");
+  if (school.estd_ad === "1978 A.D.") setSchoolValue("estd_ad", "");
+  setSchoolValue("chairman_name_en", "Jhakabir Khatri");
+  setSchoolValue("chairman_name_np", "\u091D\u0915\u092C\u093F\u0930 \u0916\u0924\u094D\u0930\u0940");
+  setSchoolValue("chairman_designation_en", "Chairman, School Management Committee");
+  setSchoolValue("chairman_designation_np", "\u0905\u0927\u094D\u092F\u0915\u094D\u0937, \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093E\u092A\u0928 \u0938\u092E\u093F\u0924\u093F");
+  setSchoolValue("chairman_message_en", school.chairman_message_en || "Ishwari Secondary School is committed to quality, inclusion, and transparent school governance.");
+  setSchoolValue("chairman_message_np", school.chairman_message_np || "\u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0917\u0941\u0923\u0938\u094D\u0924\u0930\u0940\u092F, \u0938\u092E\u093E\u0935\u0947\u0936\u0940 \u0930 \u092A\u093E\u0930\u0926\u0930\u094D\u0936\u0940 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F \u0938\u0941\u0936\u093E\u0938\u0928\u092E\u093E \u092A\u094D\u0930\u0924\u093F\u092C\u0926\u094D\u0927 \u091B\u0964");
+  setSchoolValue("chairman_status", school.chairman_status || "published");
+  setSchoolValue("principal_name_en", "Mangal Khatri");
+  setSchoolValue("principal_name_np", "\u092E\u0902\u0917\u0932 \u0916\u0924\u094D\u0930\u0940");
+  setSchoolValue("principal_designation_en", "Principal");
+  setSchoolValue("principal_designation_np", "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915");
+  if (/2035|four decades/i.test(school.principal_message_en || "")) {
+    setSchoolValue("principal_message_en", "Welcome to Ishwari Secondary School. We are committed to supporting student learning and development.");
+  }
+  if (/२०३५|चार दशक/.test(school.principal_message_np || "")) {
+    setSchoolValue("principal_message_np", "\u0908\u0936\u094D\u0935\u0930\u0940 \u092E\u093E\u0927\u094D\u092F\u092E\u093F\u0915 \u0935\u093F\u0926\u094D\u092F\u093E\u0932\u092F\u0915\u094B \u0906\u0927\u093F\u0915\u093E\u0930\u093F\u0915 \u0921\u093F\u091C\u093F\u091F\u0932 \u092A\u094B\u0930\u094D\u091F\u0932\u092E\u093E \u0939\u093E\u0930\u094D\u0926\u093F\u0915 \u0938\u094D\u0935\u093E\u0917\u0924 \u091B\u0964 \u0935\u093F\u0926\u094D\u092F\u093E\u0930\u094D\u0925\u0940\u0939\u0930\u0942\u0915\u094B \u0938\u093F\u0915\u093E\u0907 \u0930 \u0938\u0930\u094D\u0935\u093E\u0919\u094D\u0917\u0940\u0923 \u0935\u093F\u0915\u093E\u0938\u092E\u093E \u0939\u093E\u092E\u0940 \u092A\u094D\u0930\u0924\u093F\u092C\u0926\u094D\u0927 \u091B\u094C\u0902\u0964");
+  }
+  const existingStaff = Array.isArray(state.staff) ? state.staff : [];
+  const nextStaff = existingStaff.filter((member) => !outdatedSeedStaffNames.has(member.name_en.trim()) || member.role === "principal").map((member) => {
+    if (member.role !== "principal") return member;
+    if (member.name_en === "Mangal Khatri" && member.name_np === "\u092E\u0902\u0917\u0932 \u0916\u0924\u094D\u0930\u0940" && member.designation_en === "Principal" && member.designation_np === "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915") return member;
+    return {
+      ...member,
+      name_en: "Mangal Khatri",
+      name_np: "\u092E\u0902\u0917\u0932 \u0916\u0924\u094D\u0930\u0940",
+      designation_en: "Principal",
+      designation_np: "\u092A\u094D\u0930\u0927\u093E\u0928\u093E\u0927\u094D\u092F\u093E\u092A\u0915"
+    };
+  });
+  if (!nextStaff.some((member) => member.role === "principal")) {
+    nextStaff.push({ ...initialStaff[0], id: Math.max(0, ...nextStaff.map((member) => member.id)) + 1 });
+  }
+  if (!nextStaff.some((member) => member.name_en === "Bhim Bahadur Khatri")) {
+    nextStaff.push({ ...initialStaff[1], id: Math.max(0, ...nextStaff.map((member) => member.id)) + 1 });
+  }
+  if (nextStaff.length !== existingStaff.length || nextStaff.some((member, index) => member !== existingStaff[index])) {
+    state.staff = nextStaff;
+    changedModules.add("staff");
+  }
+  const intro = state.aboutSections?.find((section) => section.id === "about-intro");
+  if (intro) {
+    const updatedContentEn = intro.content_en.replace(/2035 B\.S\./g, "2028 B.S.");
+    const updatedContentNp = intro.content_np.replace(/वि\.सं\. २०३५/g, "\u0935\u093F.\u0938\u0902. \u0968\u0966\u0968\u096E");
+    if (updatedContentEn !== intro.content_en || updatedContentNp !== intro.content_np) {
+      intro.content_en = updatedContentEn;
+      intro.content_np = updatedContentNp;
+      changedModules.add("aboutSections");
+    }
+  }
+  const foundingMilestone = state.history?.find(
+    (item) => item.year.startsWith("2035 B.S.") && /founding|establishment/i.test(item.title_en)
+  );
+  if (foundingMilestone) {
+    foundingMilestone.year = "2028 B.S.";
+    changedModules.add("history");
+  }
+  const siteConfig = state.siteConfig;
+  if (siteConfig) {
+    const heroTitleEn = "Cultivating Academic Excellence & Responsible Citizens Since 2028 B.S.";
+    const heroTitleNp = "\u0935\u093F.\u0938\u0902. \u0968\u0966\u0968\u096E \u0926\u0947\u0916\u093F \u0936\u0948\u0915\u094D\u0937\u093F\u0915 \u0909\u0924\u094D\u0915\u0943\u0937\u094D\u091F\u0924\u093E \u0930 \u0928\u0948\u0924\u093F\u0915 \u091A\u0930\u093F\u0924\u094D\u0930 \u0928\u093F\u0930\u094D\u092E\u093E\u0923\u092E\u093E \u0938\u092E\u0930\u094D\u092A\u093F\u0924\u0964";
+    if ((siteConfig.heroTitleEn || "").includes("2035 B.S.")) {
+      siteConfig.heroTitleEn = heroTitleEn;
+      changedModules.add("siteConfig");
+    }
+    if ((siteConfig.heroTitleNp || "").includes("\u091A\u093E\u0930 \u0926\u0936\u0915")) {
+      siteConfig.heroTitleNp = heroTitleNp;
+      changedModules.add("siteConfig");
+    }
+    if (siteConfig.footerDescEn?.includes("2035 B.S.")) {
+      siteConfig.footerDescEn = siteConfig.footerDescEn.replace("2035 B.S.", "2028 B.S.");
+      changedModules.add("siteConfig");
+    }
+    if (siteConfig.stats?.years === "48") {
+      siteConfig.stats.years = "2028 B.S.";
+      siteConfig.stats.yearsLabelEn = "Established";
+      siteConfig.stats.yearsLabelNp = "\u0938\u094D\u0925\u093E\u092A\u0928\u093E";
+      changedModules.add("siteConfig");
+    }
+  }
+  return changedModules;
+}
 var CMSDatabaseManager = class {
   constructor() {
     this.emitter = new EventEmitter();
@@ -2122,7 +2209,8 @@ var CMSDatabaseManager = class {
           }
           await setDoc(metaRef, {
             version: defaultState.version,
-            lastModified: defaultState.lastModified
+            lastModified: defaultState.lastModified,
+            schoolFactsMigration: SCHOOL_FACTS_MIGRATION_VERSION
           });
           this.state = defaultState;
           this.isInitialLoadDone = true;
@@ -2150,6 +2238,30 @@ var CMSDatabaseManager = class {
             loadedState[key] = defaultFallback[key];
           }
         });
+        if (remoteMeta.schoolFactsMigration !== SCHOOL_FACTS_MIGRATION_VERSION) {
+          const migratedModules = migrateSchoolFacts(loadedState);
+          const migrationTimestamp = (/* @__PURE__ */ new Date()).toISOString();
+          const migratedVersion = remoteVersion + (migratedModules.size > 0 ? 1 : 0);
+          if (migratedModules.size > 0) {
+            await Promise.all(
+              [...migratedModules].map(
+                (moduleKey) => setDoc(doc(this.firestore, "cms_modules", moduleKey), {
+                  moduleId: moduleKey,
+                  data: loadedState[moduleKey],
+                  updatedAt: migrationTimestamp
+                })
+              )
+            );
+            loadedState.version = migratedVersion;
+            loadedState.lastModified = migrationTimestamp;
+          }
+          await setDoc(metaRef, {
+            ...remoteMeta,
+            version: migratedVersion,
+            lastModified: loadedState.lastModified,
+            schoolFactsMigration: SCHOOL_FACTS_MIGRATION_VERSION
+          });
+        }
         this.state = loadedState;
         this.isInitialLoadDone = true;
         return this.state;

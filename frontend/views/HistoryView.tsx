@@ -77,13 +77,13 @@ const historicalLeaders: HistoricalLeader[] = [
     key_achievement_np: "+२ विज्ञान, व्यवस्थापन र शिक्षा संकायको सम्बन्धन तथा नमुना विद्यालय अवधारणाको जग निर्माण।"
   },
   {
-    name_en: "Mr. Ram Bahadur Thapa",
-    name_np: "श्री रामबहादुर थापा",
-    tenure_bs: "२०७८ - हालसम्म",
+    name_en: "Mangal Khatri",
+    name_np: "मंगल खत्री",
+    tenure_bs: "वर्तमान",
     role_en: "Current Principal",
     role_np: "वर्तमान प्रधानाध्यापक",
-    key_achievement_en: "Steering the modern Digital Smart Campus, integrated STEAM laboratories, and nationwide Model School excellence.",
-    key_achievement_np: "आधुनिक डिजिटल स्मार्ट क्याम्पस, स्टिम प्रयोगशाला तथा राष्ट्रिय नमुना विद्यालयको सफल नेतृत्व।"
+    key_achievement_en: "Leads the school's academic and administrative work.",
+    key_achievement_np: "विद्यालयको शैक्षिक तथा प्रशासनिक कार्यको नेतृत्व।"
   }
 ];
 
@@ -91,8 +91,8 @@ const foundingPillars = [
   {
     title_en: "Community Land Donors",
     title_np: "जग्गादाता तथा समाजसेवीहरू",
-    desc_en: "Generous local village families who gifted 18 Ropanis of fertile community land in 2035 B.S. to ensure education for all children.",
-    desc_np: "वि.सं. २०३५ मा आफ्ना बालबालिकाको उज्ज्वल भविष्यका लागि १८ रोपनी बहुमूल्य जग्गा निःशुल्क दान गर्ने स्थानीय महानुभावहरू।"
+    desc_en: "Local families and community members who supported the establishment of the school and access to education.",
+    desc_np: "विद्यालय स्थापनामा सहयोग गर्ने र शिक्षाको पहुँच विस्तारमा साथ दिने स्थानीय परिवार तथा समुदायका सदस्यहरू।"
   },
   {
     title_en: "Voluntary Laborers (Shramadan)",
@@ -340,19 +340,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ lang, history, siteCon
             {/* Established Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-mono font-bold tracking-wide border border-amber-400/30 backdrop-blur-xs">
               <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              <span>{t('Established 2035 B.S. (1978 A.D.)', 'स्थापना: वि.सं. २०३५ (सन् १९७८)')}</span>
+              <span>{t('Established 2028 B.S.', 'स्थापना: वि.सं. २०२८')}</span>
             </div>
 
             {/* Main Hero Title */}
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-white drop-shadow-xs">
-              {t('Four Decades of Educational Heritage', 'गौरवमय चार दशकको ऐतिहासिक यात्रा')}
+              {t('A Legacy of Educational Service', 'शैक्षिक सेवाको गौरवमय यात्रा')}
             </h1>
 
             {/* Description */}
             <p className="text-xs sm:text-sm md:text-base text-blue-100/90 leading-relaxed drop-shadow-2xs">
               {t(
-                'From a modest community-funded hut with thatch roofing in 2035 B.S. to one of the nation’s highest-ranked Government Model Secondary Schools, Ishwari Secondary School has illuminated thousands of lives with knowledge, virtue, and resilience.',
-                'वि.सं. २०३५ मा समुदायको अगाध निष्ठा र श्रमदानबाट स्थापित सानो प्राथमिक पाठशालादेखि आजको अत्याधुनिक, प्रविधिमैत्री नमुना माध्यमिक विद्यालयसम्मको संघर्ष, समर्पण र सफलताको अविस्मरणीय इतिहास।'
+                'Established in 2028 B.S., Ishwari Secondary School is committed to providing accessible education and supporting students in their learning and development.',
+                'वि.सं. २०२८ मा स्थापित ईश्वरी माध्यमिक विद्यालय गुणस्तरीय शिक्षा प्रदान गर्न र विद्यार्थीहरूको सिकाइ तथा विकासमा सहयोग गर्न प्रतिबद्ध छ।'
               )}
             </p>
 
@@ -360,9 +360,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ lang, history, siteCon
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-white/20 text-xs">
               <div>
                 <span className="block text-xl sm:text-2xl font-black text-amber-300 font-mono">
-                  <AnimatedCounter value={isNp ? "४८+" : "48+"} /> {t('Years', 'वर्ष')}
+                  <AnimatedCounter value={isNp ? "वि.सं. २०२८" : "2028 B.S."} />
                 </span>
-                <span className="text-blue-100">{t('Years of Service', 'निरन्तर सेवा')}</span>
+                <span className="text-blue-100">{t('Established', 'स्थापना')}</span>
               </div>
               <div>
                 <span className="block text-xl sm:text-2xl font-black text-amber-300 font-mono">
@@ -404,7 +404,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ lang, history, siteCon
               <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 self-start">
                 {[
                   { id: 'all', en: 'All Eras', np: 'सबै कालखण्ड' },
-                  { id: 'foundation', en: '2035–2045', np: '२०३५–२०४५' },
+                  { id: 'foundation', en: '2028–2045', np: '२०२८–२०४५' },
                   { id: 'expansion', en: '2046–2065', np: '२०४६–२०६५' },
                   { id: 'modern', en: '2066–Present', np: '२०६६–हालसम्म' }
                 ].map(tab => (

@@ -11,10 +11,10 @@ $history = $app->getData()['history'];
 <div class="py-12 bg-white dark:bg-slate-950">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         <div class="border-b border-slate-200 dark:border-slate-800 pb-6">
-            <span class="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400"><?= $app->t('Four Decades of Excellence', 'चार दशकको ऐतिहासिक यात्रा') ?></span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400"><?= $app->t('A Legacy of Educational Service', 'शैक्षिक सेवाको गौरवमय यात्रा') ?></span>
             <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white mt-1"><?= $app->t('Institutional History & Heritage', 'विद्यालयको गौरवमय इतिहास') ?></h1>
             <p class="text-sm text-slate-500 mt-2 leading-relaxed">
-                <?= $app->t('From a humble community-funded primary school in 2035 B.S. to a prestigious Government Model Secondary Institution.', 'वि.सं. २०३५ मा समुदायको सहयोगमा स्थापित प्राथमिक पाठशालादेखि आजको अत्याधुनिक नमुना माध्यमिक विद्यालयसम्मको यात्रा।') ?>
+                <?= $app->t('Established in 2028 B.S., Ishwari Secondary School is committed to providing accessible education and supporting students in their learning and development.', 'वि.सं. २०२८ मा स्थापित ईश्वरी माध्यमिक विद्यालय गुणस्तरीय शिक्षा प्रदान गर्न र विद्यार्थीहरूको सिकाइ तथा विकासमा सहयोग गर्न प्रतिबद्ध छ।') ?>
             </p>
         </div>
 

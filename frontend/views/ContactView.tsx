@@ -225,7 +225,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ lang, school, siteConf
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder={t('e.g. Ram Bahadur Thapa', 'जस्तै: राम बहादुर थापा')}
+                        placeholder={t('Your name', 'तपाईंको नाम')}
                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#1E40AF] text-xs"
                       />
                     </div>

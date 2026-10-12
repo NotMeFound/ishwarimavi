@@ -71,8 +71,8 @@ export const AdminGovernanceTab: React.FC<AdminGovernanceTabProps> = ({
   const [chairmanSearch, setChairmanSearch] = useState('');
   const [chairmanStatus, setChairmanStatus] = useState('all');
   const [chairmanForm, setChairmanForm] = useState({
-    name_en: school.chairman_name_en || 'Mr. Lokendra Bahadur Shrestha',
-    name_np: school.chairman_name_np || 'श्री लोकेन्द्र बहादुर श्रेष्ठ',
+    name_en: school.chairman_name_en || 'Jhakabir Khatri',
+    name_np: school.chairman_name_np || 'झकबिर खत्री',
     designation_en: school.chairman_designation_en || 'Chairman, School Management Committee',
     designation_np: school.chairman_designation_np || 'अध्यक्ष, विद्यालय व्यवस्थापन समिति',
     address_en: school.chairman_address_en || school.address_en || 'Ward No. 4, Baijanath, Banke, Nepal',
@@ -89,14 +89,14 @@ export const AdminGovernanceTab: React.FC<AdminGovernanceTabProps> = ({
   const [principalSearch, setPrincipalSearch] = useState('');
   const [principalStatus, setPrincipalStatus] = useState('all');
   const [principalForm, setPrincipalForm] = useState({
-    name_en: school.principal_name_en || 'Mr. Narayan Prasad Koirala',
-    name_np: school.principal_name_np || 'श्री नारायण प्रसाद कोइराला',
-    designation_en: school.principal_designation_en || 'Headmaster / Principal (M.Ed, M.A.)',
+    name_en: school.principal_name_en || 'Mangal Khatri',
+    name_np: school.principal_name_np || 'मंगल खत्री',
+    designation_en: school.principal_designation_en || 'Principal',
     designation_np: school.principal_designation_np || 'प्रधानाध्यापक',
     address_en: school.principal_address_en || school.address_en || 'Ward No. 4, Baijanath, Banke, Nepal',
     address_np: school.principal_address_np || school.address_np || 'वडा नं. ४, बैजनाथ, बाँके, नेपाल',
-    message_en: school.principal_message_en || 'Welcome to Ishwari Secondary School. For over four decades, our institution has stood as a beacon of public education, blending academic rigor with compassionate moral values.',
-    message_np: school.principal_message_np || 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक डिजिटल पोर्टलमा यहाँहरूलाई हार्दिक स्वागत छ। वि.सं. २०३५ सालदेखि यस भेगकै अग्रणी सामुदायिक नमुना विद्यालयको रूपमा हामीले विद्यार्थीहरूको चौतर्फी विकासमा जोड दिँदै आएका छौं।',
+    message_en: school.principal_message_en || 'Welcome to Ishwari Secondary School. We are committed to supporting student learning and development.',
+    message_np: school.principal_message_np || 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक डिजिटल पोर्टलमा हार्दिक स्वागत छ। विद्यार्थीहरूको सिकाइ र सर्वाङ्गीण विकासमा हामी प्रतिबद्ध छौं।',
     image: school.principal_image || '',
     status: school.principal_status || 'published'
   });
@@ -453,7 +453,7 @@ export const AdminGovernanceTab: React.FC<AdminGovernanceTabProps> = ({
                         setChairmanForm({ ...chairmanForm, name_en: e.target.value });
                         if (chairmanErrors.name_en) setChairmanErrors(prev => ({ ...prev, name_en: '' }));
                       }}
-                      placeholder={t('e.g. Lokendra Bahadur Shrestha', 'जस्तै: लोकेन्द्र बहादुर श्रेष्ठ')}
+                      placeholder={t('e.g. Jhakabir Khatri', 'जस्तै: झकबिर खत्री')}
                       className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition ${
                         chairmanErrors.name_en ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:border-[#1E40AF]'
                       }`}
@@ -786,7 +786,7 @@ export const AdminGovernanceTab: React.FC<AdminGovernanceTabProps> = ({
                         setPrincipalForm({ ...principalForm, name_en: e.target.value });
                         if (principalErrors.name_en) setPrincipalErrors(prev => ({ ...prev, name_en: '' }));
                       }}
-                      placeholder={t('e.g. Mr. Narayan Prasad Koirala', 'जस्तै: श्री नारायण प्रसाद कोइराला')}
+                      placeholder={t('e.g. Mangal Khatri', 'जस्तै: मंगल खत्री')}
                       className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition ${
                         principalErrors.name_en ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:border-[#1E40AF]'
                       }`}
@@ -1131,7 +1131,7 @@ export const AdminGovernanceTab: React.FC<AdminGovernanceTabProps> = ({
                         setSmcForm({ ...smcForm, name_en: e.target.value });
                         if (smcErrors.name_en) setSmcErrors(prev => ({ ...prev, name_en: '' }));
                       }}
-                      placeholder={t('e.g. Lokendra Bahadur Shrestha', 'जस्तै: लोकेन्द्र बहादुर श्रेष्ठ')}
+                      placeholder={t('e.g. Jhakabir Khatri', 'जस्तै: झकबिर खत्री')}
                       className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 text-slate-900 dark:text-white transition ${
                         smcErrors.name_en ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700 focus:border-[#1E40AF]'
                       }`}

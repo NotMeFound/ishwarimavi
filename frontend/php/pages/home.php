@@ -30,8 +30,8 @@ $facilities = array_slice($app->getData()['facilities'], 0, 4);
 
                 <p class="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
                     <?= $app->e($app->t(
-                        "Ishwari Secondary School has stood as a beacon of academic rigor, character development, and public service since 2035 B.S. Providing comprehensive education from ECD through Higher Secondary (+2 Science & Management).",
-                        "वि.सं. २०३५ देखि ईश्वरी माध्यमिक विद्यालयले गुणस्तरीय शिक्षा, नैतिक संस्कार र राष्ट्रसेवामा समर्पित विद्यार्थी निर्माण गर्दै आएको छ। प्रारम्भिक बालविकासदेखि कक्षा १२ (विज्ञान तथा व्यवस्थापन) सम्म आधुनिक शिक्षण पद्धति।"
+                        "Ishwari Secondary School has been committed to academic learning, character development, and public service since 2028 B.S. Providing comprehensive education from ECD through Higher Secondary (+2 Science & Management).",
+                        "वि.सं. २०२८ देखि ईश्वरी माध्यमिक विद्यालयले गुणस्तरीय शिक्षा, नैतिक संस्कार र राष्ट्रसेवामा समर्पित विद्यार्थी निर्माण गर्दै आएको छ। प्रारम्भिक बालविकासदेखि कक्षा १२ (विज्ञान तथा व्यवस्थापन) सम्म आधुनिक शिक्षण पद्धति।"
                     )) ?>
                 </p>
 
@@ -130,6 +130,16 @@ $facilities = array_slice($app->getData()['facilities'], 0, 4);
                     <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                         Ishwari Secondary School
                     </p>
+                    <?php if (!empty($school['chairman_en'])): ?>
+                        <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                <?= $app->t('School Management Committee Chairman', 'विद्यालय व्यवस्थापन समितिका अध्यक्ष') ?>
+                            </p>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white mt-1">
+                                <?= $app->e($app->t($school['chairman_en'], $school['chairman_np'] ?? $school['chairman_en'])) ?>
+                            </p>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="md:col-span-8 space-y-4">

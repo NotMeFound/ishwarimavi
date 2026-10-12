@@ -284,10 +284,15 @@ class APIClient {
   }
 
   public getToken(): string | null {
+    const sharedToken = safeStorage.getItem('ishwari_server_token');
+    if (sharedToken) {
+      this.sessionToken = sharedToken;
+      return sharedToken;
+    }
+
     return (
       this.sessionToken ||
       safeSessionStorage.getItem('ishwari_server_token') ||
-      safeStorage.getItem('ishwari_server_token') ||
       null
     );
   }
@@ -484,7 +489,7 @@ class APIClient {
     authenticated: boolean;
     sessionExpiresAt?: number;
   }> {
-    try {
+    const refresh = async () => {
       const res = await fetch(getApiUrl('/api/auth/refresh'), {
         method: 'POST',
         headers: {
@@ -513,6 +518,13 @@ class APIClient {
         success: res.status === 401,
         authenticated: false
       };
+    };
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.locks) {
+        return await navigator.locks.request('ishwari-admin-session-refresh', refresh);
+      }
+      return await refresh();
     } catch {
       return { success: false, authenticated: false };
     }

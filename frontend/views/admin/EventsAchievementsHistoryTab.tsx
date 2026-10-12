@@ -127,7 +127,7 @@ export const EventsAchievementsHistoryTab: React.FC<EventsAchievementsHistoryTab
   const [isEditingHistory, setIsEditingHistory] = useState(false);
   const [editingHistoryIndex, setEditingHistoryIndex] = useState<number | null>(null);
   const [historyForm, setHistoryForm] = useState<HistoryItem>({
-    year: '2035 BS',
+    year: '2028 BS',
     title_en: '',
     title_np: '',
     desc_en: '',
@@ -1166,7 +1166,7 @@ export const EventsAchievementsHistoryTab: React.FC<EventsAchievementsHistoryTab
                     value={historyForm.year}
                     onChange={(e) => setHistoryForm(prev => ({ ...prev, year: e.target.value }))}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800"
-                    placeholder="e.g. 2035 BS"
+                    placeholder="e.g. 2028 BS"
                     required
                   />
                 </div>
@@ -1235,7 +1235,7 @@ export const EventsAchievementsHistoryTab: React.FC<EventsAchievementsHistoryTab
                         value={historyForm.image_caption_en || ''}
                         onChange={(e) => setHistoryForm(prev => ({ ...prev, image_caption_en: e.target.value }))}
                         className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800"
-                        placeholder="e.g. Inauguration ceremony in 2035 BS"
+                        placeholder="e.g. School opening ceremony in 2028 BS"
                       />
                     </div>
                     <div className="space-y-1 sm:col-span-1.5">

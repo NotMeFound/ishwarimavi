@@ -77,7 +77,7 @@ export const Footer: React.FC<FooterProps> = ({
   // Dynamic School Narrative
   const footerDescription = isNp
     ? (siteConfig?.footerDescNp || 'वि.सं. २०३५ देखि गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षा प्रदान गर्दै आइरहेको अग्रणी नमुना सामुदायिक विद्यालय।')
-    : (siteConfig?.footerDescEn || 'Committed to excellence, integrity, and social responsibility in public secondary education since 2035 B.S.');
+    : (siteConfig?.footerDescEn || 'Committed to excellence, integrity, and social responsibility in public secondary education since 2028 B.S.');
 
   // Clean primary phone and email for tel:/mailto: links
   const primaryPhone = school.phone ? school.phone.split('/')[0].trim() : '';

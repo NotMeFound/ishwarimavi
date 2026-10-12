@@ -151,19 +151,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Dynamic School Statistics (Calculated from Real Database Records when available)
   const computedStats = useMemo(() => {
-    // Years of Service calculation from Estd BS
-    let yearsOfService = statsConfig.years || '48';
-    if (school.estd_bs) {
-      const match = school.estd_bs.match(/\d{4}/);
-      if (match) {
-        const estdYear = parseInt(match[0], 10);
-        const currentBsYear = 2083;
-        if (estdYear > 1900 && estdYear <= currentBsYear) {
-          yearsOfService = String(currentBsYear - estdYear);
-        }
-      }
-    }
-
     // Certified staff count
     const staffCount = staff.length > 0 ? String(staff.length) : statsConfig.staff;
 
@@ -174,9 +161,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
       staff: staffCount,
       staffLabelEn: statsConfig.staffLabelEn || 'Faculty & Staff',
       staffLabelNp: statsConfig.staffLabelNp || 'शिक्षक तथा कर्मचारी',
-      years: yearsOfService,
-      yearsLabelEn: statsConfig.yearsLabelEn || 'Years of Service',
-      yearsLabelNp: statsConfig.yearsLabelNp || 'वर्षको गौरवमय इतिहास',
+      years: school.estd_bs || statsConfig.years || '2028 B.S.',
+      yearsLabelEn: statsConfig.yearsLabelEn || 'Established',
+      yearsLabelNp: statsConfig.yearsLabelNp || 'स्थापना',
       successRate: statsConfig.successRate || '100%',
       successLabelEn: statsConfig.successLabelEn || 'SEE Success Rate',
       successLabelNp: statsConfig.successLabelNp || 'एसईई परीक्षा सफलता',
@@ -642,6 +629,16 @@ Website: Official Institutional Web Portal
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {t(school.name_en, school.name_np)}
                   </p>
+                  {school.chairman_name_en?.trim() && (
+                    <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {t('School Management Committee Chairman', 'विद्यालय व्यवस्थापन समितिका अध्यक्ष')}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white mt-1">
+                        {t(school.chairman_name_en, school.chairman_name_np || school.chairman_name_en)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

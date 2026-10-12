@@ -55,14 +55,14 @@ export const defaultAboutSections: AboutSection[] = [
     title_en: 'About Ishwari Secondary School',
     title_np: 'ईश्वरी माध्यमिक विद्यालयको बारेमा',
     category: 'overview',
-    content_en: `Shree Ishwari Secondary School was established in 2035 B.S. and has continued to provide quality, accessible education to students across the community.
+    content_en: `Shree Ishwari Secondary School was established in 2028 B.S. and has continued to provide quality, accessible education to students across the community.
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:Main School Academic Block|caption:Shree Ishwari Secondary School Academic Campus Block]]
 
 Over the decades, the institution has steadily expanded its educational programs, infrastructure, and learning environment. Through generous community collaboration and dedicated governmental support, the school has developed modern multimedia classrooms, fully-equipped science and computer laboratories, and sports grounds.
 
 Today, Ishwari Secondary School stands as a model community learning center where academic rigor, ethical discipline, and scientific inquiry are nurtured together.`,
-    content_np: `श्री ईश्वरी माध्यमिक विद्यालय वि.सं. २०३५ सालमा स्थापित भई यस भेगका बालबालिकाहरूलाई गुणस्तरीय, सुलभ र व्यावहारिक शिक्षा प्रदान गर्दै आइरहेको एक ऐतिहासिक सामुदायिक शैक्षिक संस्था हो।
+    content_np: `श्री ईश्वरी माध्यमिक विद्यालय वि.सं. २०२८ सालमा स्थापित भई यस भेगका बालबालिकाहरूलाई गुणस्तरीय, सुलभ र व्यावहारिक शिक्षा प्रदान गर्दै आइरहेको एक ऐतिहासिक सामुदायिक शैक्षिक संस्था हो।
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:विद्यालयको मुख्य शैक्षिक भवन|caption:श्री ईश्वरी माध्यमिक विद्यालयको शैक्षिक परिसर]]
 
@@ -290,6 +290,124 @@ const CMS_MODULE_KEYS = [
   'adminAccounts'
 ] as const;
 
+const outdatedSeedStaffNames = new Set([
+  'Mr. Narayan Prasad Koirala',
+  'Mrs. Sharada Devi Sharma',
+  'Mr. Rameshwor Gautam',
+  'Ms. Binita Thapa',
+  'Mr. Lokendra Bahadur Thapa',
+  'Ms. Kamala Adhikari'
+]);
+const SCHOOL_FACTS_MIGRATION_VERSION = 'school-facts-2028-v1';
+
+function migrateSchoolFacts(state: CMSDatabaseState): Set<keyof CMSDatabaseState> {
+  const changedModules = new Set<keyof CMSDatabaseState>();
+  const school = state.school;
+  const setSchoolValue = <K extends keyof SchoolData>(key: K, value: SchoolData[K]) => {
+    if (school[key] !== value) {
+      school[key] = value;
+      changedModules.add('school');
+    }
+  };
+
+  if (school.estd_bs === '2035 B.S.') setSchoolValue('estd_bs', '2028 B.S.');
+  if (school.estd_ad === '1978 A.D.') setSchoolValue('estd_ad', '');
+
+  setSchoolValue('chairman_name_en', 'Jhakabir Khatri');
+  setSchoolValue('chairman_name_np', 'झकबिर खत्री');
+  setSchoolValue('chairman_designation_en', 'Chairman, School Management Committee');
+  setSchoolValue('chairman_designation_np', 'अध्यक्ष, विद्यालय व्यवस्थापन समिति');
+  setSchoolValue('chairman_message_en', school.chairman_message_en || 'Ishwari Secondary School is committed to quality, inclusion, and transparent school governance.');
+  setSchoolValue('chairman_message_np', school.chairman_message_np || 'ईश्वरी माध्यमिक विद्यालय गुणस्तरीय, समावेशी र पारदर्शी विद्यालय सुशासनमा प्रतिबद्ध छ।');
+  setSchoolValue('chairman_status', school.chairman_status || 'published');
+
+  setSchoolValue('principal_name_en', 'Mangal Khatri');
+  setSchoolValue('principal_name_np', 'मंगल खत्री');
+  setSchoolValue('principal_designation_en', 'Principal');
+  setSchoolValue('principal_designation_np', 'प्रधानाध्यापक');
+  if (/2035|four decades/i.test(school.principal_message_en || '')) {
+    setSchoolValue('principal_message_en', 'Welcome to Ishwari Secondary School. We are committed to supporting student learning and development.');
+  }
+  if (/२०३५|चार दशक/.test(school.principal_message_np || '')) {
+    setSchoolValue('principal_message_np', 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक डिजिटल पोर्टलमा हार्दिक स्वागत छ। विद्यार्थीहरूको सिकाइ र सर्वाङ्गीण विकासमा हामी प्रतिबद्ध छौं।');
+  }
+
+  const existingStaff = Array.isArray(state.staff) ? state.staff : [];
+  const nextStaff = existingStaff
+    .filter(member => !outdatedSeedStaffNames.has(member.name_en.trim()) || member.role === 'principal')
+    .map(member => {
+      if (member.role !== 'principal') return member;
+      if (
+        member.name_en === 'Mangal Khatri' &&
+        member.name_np === 'मंगल खत्री' &&
+        member.designation_en === 'Principal' &&
+        member.designation_np === 'प्रधानाध्यापक'
+      ) return member;
+      return {
+        ...member,
+        name_en: 'Mangal Khatri',
+        name_np: 'मंगल खत्री',
+        designation_en: 'Principal',
+        designation_np: 'प्रधानाध्यापक'
+      };
+    });
+  if (!nextStaff.some(member => member.role === 'principal')) {
+    nextStaff.push({ ...initialStaff[0], id: Math.max(0, ...nextStaff.map(member => member.id)) + 1 });
+  }
+  if (!nextStaff.some(member => member.name_en === 'Bhim Bahadur Khatri')) {
+    nextStaff.push({ ...initialStaff[1], id: Math.max(0, ...nextStaff.map(member => member.id)) + 1 });
+  }
+  if (nextStaff.length !== existingStaff.length || nextStaff.some((member, index) => member !== existingStaff[index])) {
+    state.staff = nextStaff;
+    changedModules.add('staff');
+  }
+
+  const intro = state.aboutSections?.find(section => section.id === 'about-intro');
+  if (intro) {
+    const updatedContentEn = intro.content_en.replace(/2035 B\.S\./g, '2028 B.S.');
+    const updatedContentNp = intro.content_np.replace(/वि\.सं\. २०३५/g, 'वि.सं. २०२८');
+    if (updatedContentEn !== intro.content_en || updatedContentNp !== intro.content_np) {
+      intro.content_en = updatedContentEn;
+      intro.content_np = updatedContentNp;
+      changedModules.add('aboutSections');
+    }
+  }
+
+  const foundingMilestone = state.history?.find(item =>
+    item.year.startsWith('2035 B.S.') && /founding|establishment/i.test(item.title_en)
+  );
+  if (foundingMilestone) {
+    foundingMilestone.year = '2028 B.S.';
+    changedModules.add('history');
+  }
+
+  const siteConfig = state.siteConfig;
+  if (siteConfig) {
+    const heroTitleEn = 'Cultivating Academic Excellence & Responsible Citizens Since 2028 B.S.';
+    const heroTitleNp = 'वि.सं. २०२८ देखि शैक्षिक उत्कृष्टता र नैतिक चरित्र निर्माणमा समर्पित।';
+    if ((siteConfig.heroTitleEn || '').includes('2035 B.S.')) {
+      siteConfig.heroTitleEn = heroTitleEn;
+      changedModules.add('siteConfig');
+    }
+    if ((siteConfig.heroTitleNp || '').includes('चार दशक')) {
+      siteConfig.heroTitleNp = heroTitleNp;
+      changedModules.add('siteConfig');
+    }
+    if (siteConfig.footerDescEn?.includes('2035 B.S.')) {
+      siteConfig.footerDescEn = siteConfig.footerDescEn.replace('2035 B.S.', '2028 B.S.');
+      changedModules.add('siteConfig');
+    }
+    if (siteConfig.stats?.years === '48') {
+      siteConfig.stats.years = '2028 B.S.';
+      siteConfig.stats.yearsLabelEn = 'Established';
+      siteConfig.stats.yearsLabelNp = 'स्थापना';
+      changedModules.add('siteConfig');
+    }
+  }
+
+  return changedModules;
+}
+
 class CMSDatabaseManager {
   private firestore: Firestore;
   private state: CMSDatabaseState;
@@ -373,14 +491,19 @@ class CMSDatabaseManager {
           }
           await setDoc(metaRef, {
             version: defaultState.version,
-            lastModified: defaultState.lastModified
+            lastModified: defaultState.lastModified,
+            schoolFactsMigration: SCHOOL_FACTS_MIGRATION_VERSION
           });
           this.state = defaultState;
           this.isInitialLoadDone = true;
           return this.state;
         }
 
-        const remoteMeta = metaSnap.data() as { version: number; lastModified: string };
+        const remoteMeta = metaSnap.data() as {
+          version: number;
+          lastModified: string;
+          schoolFactsMigration?: string;
+        };
         const remoteVersion = remoteMeta?.version || 1;
 
         if (this.isInitialLoadDone && !forceFresh && this.state && this.state.version >= remoteVersion) {
@@ -408,6 +531,31 @@ class CMSDatabaseManager {
             (loadedState as any)[key] = (defaultFallback as any)[key];
           }
         });
+
+        if (remoteMeta.schoolFactsMigration !== SCHOOL_FACTS_MIGRATION_VERSION) {
+          const migratedModules = migrateSchoolFacts(loadedState as CMSDatabaseState);
+          const migrationTimestamp = new Date().toISOString();
+          const migratedVersion = remoteVersion + (migratedModules.size > 0 ? 1 : 0);
+          if (migratedModules.size > 0) {
+            await Promise.all(
+              [...migratedModules].map(moduleKey =>
+                setDoc(doc(this.firestore, 'cms_modules', moduleKey), {
+                  moduleId: moduleKey,
+                  data: (loadedState as any)[moduleKey],
+                  updatedAt: migrationTimestamp
+                })
+              )
+            );
+            loadedState.version = migratedVersion;
+            loadedState.lastModified = migrationTimestamp;
+          }
+          await setDoc(metaRef, {
+            ...remoteMeta,
+            version: migratedVersion,
+            lastModified: loadedState.lastModified,
+            schoolFactsMigration: SCHOOL_FACTS_MIGRATION_VERSION
+          });
+        }
 
         this.state = loadedState as CMSDatabaseState;
         this.isInitialLoadDone = true;

@@ -50,21 +50,25 @@ export const initialSchoolData: SchoolData = {
   affiliation_en: "National Examination Board (NEB) Affiliated Model Community School",
   affiliation_np: "राष्ट्रिय परीक्षा बोर्ड (NEB) सम्बन्धन प्राप्त नमुना सामुदायिक विद्यालय",
   code: "EMIS: 48012004",
-  estd_bs: "2035 B.S.",
-  estd_ad: "1978 A.D.",
+  estd_bs: "2028 B.S.",
+  estd_ad: "",
   phone: "+977-081-560123 / 9858012345",
   email: "info@ishwari.edu.np",
   address_en: "Baijanath Rural Municipality - 5, Banke, Lumbini Province, Nepal",
   address_np: "बैजनाथ गाउँपालिका वडा नं. ५, बाँके, लुम्बिनी प्रदेश, नेपाल",
   map_embed_url: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d112450.47271926677!2d81.6033324!3d28.2166667!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3998650000000001%3A0x0!2sBaijanath%2C%20Banke!5e0!3m2!1sen!2snp!4v1620000000000!5m2!1sen!2snp",
   map_url: "https://maps.google.com/?q=Shree+Ishwari+Secondary+School+Baijanath+5+Banke+Nepal",
-  principal_name_en: "Mr. Narayan Prasad Koirala",
-  principal_name_np: "श्री नारायण प्रसाद कोइराला",
+  chairman_name_en: "Jhakabir Khatri",
+  chairman_name_np: "झकबिर खत्री",
+  chairman_designation_en: "Chairman, School Management Committee",
+  chairman_designation_np: "अध्यक्ष, विद्यालय व्यवस्थापन समिति",
+  principal_name_en: "Mangal Khatri",
+  principal_name_np: "मंगल खत्री",
   principal_designation_en: "Headmaster / Principal (M.Ed, M.A.)",
   principal_designation_np: "प्रधानाध्यापक",
   principal_image: "",
-  principal_message_en: "Welcome to Shree Ishwari Secondary School, Baijanath-5, Banke. For over four decades, our institution has stood as a beacon of quality community education in Banke district, blending modern curriculum with values of integrity and societal leadership.",
-  principal_message_np: "श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ-५, बाँकेको आधिकारिक डिजिटल पोर्टलमा यहाँहरूलाई हार्दिक स्वागत छ। वि.सं. २०३५ सालदेखि यस भेगकै अग्रणी सामुदायिक नमुना विद्यालयको रूपमा हामीले विद्यार्थीहरूको चौतर्फी बौद्धिक, प्राविधिक र नैतिक विकासमा जोड दिँदै आएका छौं।",
+  principal_message_en: "Welcome to Shree Ishwari Secondary School, Baijanath-5, Banke. We are committed to supporting student learning and development.",
+  principal_message_np: "श्री ईश्वरी माध्यमिक विद्यालय, बैजनाथ-५, बाँकेको आधिकारिक डिजिटल पोर्टलमा हार्दिक स्वागत छ। विद्यार्थीहरूको सिकाइ र सर्वाङ्गीण विकासमा हामी प्रतिबद्ध छौं।",
   home_bg_image: "",
   home_bg_enabled: false,
 };
@@ -111,39 +115,21 @@ export const initialNotices: Notice[] = [
 export const initialStaff: StaffMember[] = [
   {
     id: 1,
-    name_en: "Mr. Narayan Prasad Koirala",
-    name_np: "श्री नारायण प्रसाद कोइराला",
+    name_en: "Mangal Khatri",
+    name_np: "मंगल खत्री",
     role: "principal",
-    designation_en: "Headmaster / Principal (M.Ed, M.A.)",
-    designation_np: "प्रधानाध्यापक (एम.एड, एम.ए.)",
-    experience: "26 Years in Educational Leadership"
+    designation_en: "Principal",
+    designation_np: "प्रधानाध्यापक",
+    experience: ""
   },
   {
     id: 2,
-    name_en: "Mrs. Sharada Devi Sharma",
-    name_np: "श्रीमती शारदा देवी शर्मा",
+    name_en: "Bhim Bahadur Khatri",
+    name_np: "भीम बहादुर खत्री",
     role: "teacher",
-    designation_en: "Senior Science Coordinator (M.Sc. Physics)",
-    designation_np: "वरिष्ठ विज्ञान संयोजक (एम.एससी.)",
-    experience: "18 Years Experience"
-  },
-  {
-    id: 3,
-    name_en: "Mr. Rameshwor Gautam",
-    name_np: "श्री रामेश्वर गौतम",
-    role: "teacher",
-    designation_en: "Head of Mathematics (M.Sc. Mathematics)",
-    designation_np: "गणित विभाग प्रमुख (एम.एससी.)",
-    experience: "21 Years Experience"
-  },
-  {
-    id: 4,
-    name_en: "Ms. Binita Thapa",
-    name_np: "सुश्री बिनिता थापा",
-    role: "teacher",
-    designation_en: "ICT & Computer Science Lead (B.Sc. CSIT)",
-    designation_np: "कम्प्युटर तथा सूचना प्रविधि विभाग प्रमुख",
-    experience: "8 Years Experience"
+    designation_en: "Social Studies Teacher",
+    designation_np: "सामाजिक अध्ययन शिक्षक",
+    experience: ""
   }
 ];
 
@@ -231,7 +217,7 @@ export const initialAchievements: Achievement[] = [
 export const initialHistory: HistoryItem[] = [
   {
     id: 1,
-    year: "2035 B.S. (1978 A.D.)",
+    year: "2028 B.S.",
     title_en: "Founding as Community Primary School",
     title_np: "प्राथमिक विद्यालयको रूपमा स्थापना",
     desc_en: "Inaugurated through community patronage to provide accessible education to rural youths with thatch roofing and dedicated local educators.",
@@ -463,8 +449,8 @@ export const initialSiteConfig: SiteCustomizerConfig = {
   alertTickerNp: 'शैक्षिक सत्र २०८३ को वार्षिक परीक्षा तालिका (कक्षा १ देखि ९ सम्म) प्रकाशित गरिएको बारे',
   heroBadgeEn: 'CENTER FOR ACADEMIC EXCELLENCE & CHARACTER BUILDING',
   heroBadgeNp: 'शैक्षिक उत्कृष्टता र चरित्र निर्माणको केन्द्र',
-  heroTitleEn: 'Cultivating Academic Excellence & Responsible Citizens Since 2035 B.S.',
-  heroTitleNp: 'शैक्षिक उत्कृष्टता र नैतिक चरित्र निर्माणको चार दशक लामो यात्रा।',
+  heroTitleEn: 'Cultivating Academic Excellence & Responsible Citizens Since 2028 B.S.',
+  heroTitleNp: 'वि.सं. २०२८ देखि शैक्षिक उत्कृष्टता र नैतिक चरित्र निर्माणमा समर्पित।',
   heroSubtitleEn: 'A premier community educational institution offering experiential STEM pedagogy, digital classrooms, high-standard laboratories, and holistic secondary and higher secondary education.',
   heroSubtitleNp: 'अनुभवी शिक्षक, आधुनिक विज्ञान तथा कम्प्युटर प्रयोगशाला र डिजिटल स्मार्ट कक्षाकोठाका माध्यमबाट विद्यार्थीहरूको चौतर्फी विकासमा समर्पित।',
   homeBgImage: '',
@@ -486,9 +472,9 @@ export const initialSiteConfig: SiteCustomizerConfig = {
     staff: '52',
     staffLabelEn: 'Faculty & Staff',
     staffLabelNp: 'शिक्षक तथा कर्मचारी',
-    years: '48',
-    yearsLabelEn: 'Years of Service',
-    yearsLabelNp: 'वर्षको गौरवमय इतिहास',
+    years: '2028 B.S.',
+    yearsLabelEn: 'Established',
+    yearsLabelNp: 'स्थापना',
     successRate: '100%',
     successLabelEn: 'SEE Success Rate',
     successLabelNp: 'एसईई परीक्षा सफलता',
@@ -508,7 +494,7 @@ export const initialSiteConfig: SiteCustomizerConfig = {
     community: true,
     contact: true,
   },
-  footerDescEn: 'Committed to excellence, integrity, and social responsibility in public secondary education since 2035 B.S.',
+  footerDescEn: 'Committed to excellence, integrity, and social responsibility in public secondary education since 2028 B.S.',
   footerDescNp: 'वि.सं. २०३५ देखि गुणस्तरीय, प्रविधिमैत्री र नैतिक शिक्षा प्रदान गर्दै आइरहेको अग्रणी नमुना सामुदायिक विद्यालय।',
   copyrightTextEn: 'Ishwari Secondary School. All rights reserved.',
   copyrightTextNp: 'ईश्वरी माध्यमिक विद्यालय। सर्वाधिकार सुरक्षित।',
@@ -703,8 +689,8 @@ export const initialSiteConfig: SiteCustomizerConfig = {
       id: 'about',
       nameEn: 'About School & Educational Pillars',
       nameNp: 'विद्यालय परिचय तथा स्तम्भहरू',
-      title_en: 'Four Decades of Academic Distinction',
-      title_np: 'शैक्षिक उत्कृष्टताको चार दशक लामो यात्रा',
+      title_en: 'A Legacy of Academic Distinction',
+      title_np: 'शैक्षिक उत्कृष्टताको गौरवमय यात्रा',
       subtitle_en: 'Dedicated to moral character, modern pedagogy, and equal learning opportunity.',
       subtitle_np: 'नैतिक चरित्र, आधुनिक शिक्षण र समान अवसरमा समर्पित।',
       enabled: true,
@@ -1047,14 +1033,14 @@ export const initialAboutSections: AboutSection[] = [
     title_en: 'About Ishwari Secondary School',
     title_np: 'ईश्वरी माध्यमिक विद्यालयको बारेमा',
     category: 'overview',
-    content_en: `Shree Ishwari Secondary School was established in 2035 B.S. and has continued to provide quality, accessible education to students across the community.
+    content_en: `Shree Ishwari Secondary School was established in 2028 B.S. and has continued to provide quality, accessible education to students across the community.
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:Main School Academic Block|caption:Shree Ishwari Secondary School Academic Campus Block]]
 
 Over the decades, the institution has steadily expanded its educational programs, infrastructure, and learning environment. Through generous community collaboration and dedicated governmental support, the school has developed modern multimedia classrooms, fully-equipped science and computer laboratories, and sports grounds.
 
 Today, Ishwari Secondary School stands as a model community learning center where academic rigor, ethical discipline, and scientific inquiry are nurtured together.`,
-    content_np: `श्री ईश्वरी माध्यमिक विद्यालय वि.सं. २०३५ सालमा स्थापित भई यस भेगका बालबालिकाहरूलाई गुणस्तरीय, सुलभ र व्यावहारिक शिक्षा प्रदान गर्दै आइरहेको एक ऐतिहासिक सामुदायिक शैक्षिक संस्था हो।
+    content_np: `श्री ईश्वरी माध्यमिक विद्यालय वि.सं. २०२८ सालमा स्थापित भई यस भेगका बालबालिकाहरूलाई गुणस्तरीय, सुलभ र व्यावहारिक शिक्षा प्रदान गर्दै आइरहेको एक ऐतिहासिक सामुदायिक शैक्षिक संस्था हो।
 
 [[image:https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80|align:right|size:medium|alt:विद्यालयको मुख्य शैक्षिक भवन|caption:श्री ईश्वरी माध्यमिक विद्यालयको शैक्षिक परिसर]]
 
@@ -1610,7 +1596,3 @@ export const initialFAQs: SchoolFAQItem[] = [
     updated_at: '2026-01-01T00:00:00.000Z'
   }
 ];
-
-
-
-

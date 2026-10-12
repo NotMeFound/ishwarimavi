@@ -12,21 +12,23 @@ return [
         'affiliation_en' => 'Government of Nepal Model School • Ministry of Education',
         'affiliation_np' => 'नेपाल सरकार नमुना विद्यालय • शिक्षा मन्त्रालय',
         'code' => 'EMIS: 48012004',
-        'estd_bs' => '2035 B.S.',
-        'estd_ad' => '1978 A.D.',
+        'estd_bs' => '2028 B.S.',
+        'estd_ad' => '',
         'address_en' => 'Ward No. 4, Bagmati / Gandaki Province, Nepal',
         'address_np' => 'वडा नं. ४, बागमती / गण्डकी प्रदेश, नेपाल',
         'phone' => '+977-01-5542109 / 9851234567',
         'email' => 'info@ishwari.edu.np',
         'website' => 'https://ishwari.edu.np',
-        'principal_en' => 'Mr. Narayan Prasad Koirala',
-        'principal_np' => 'श्री नारायण प्रसाद कोइराला',
-        'principal_message_en' => "Welcome to Ishwari Secondary School. For more than four decades, our institution has remained dedicated to providing accessible, high-standard education grounded in scientific inquiry, moral integrity, and national service. We take immense pride in nurturing students who excel academically while remaining deeply committed to community welfare.",
-        'principal_message_np' => "ईश्वरी माध्यमिक विद्यालयको आधिकारिक वेब पोर्टलमा हार्दिक स्वागत गर्दछौं। विगत चार दशकभन्दा बढी समयदेखि हाम्रो संस्थाले वैज्ञानिक दृष्टिकोण, नैतिक निष्ठा र राष्ट्रसेवामा आधारित गुणस्तरीय तथा सुलभ शिक्षा प्रदान गर्दै आएको छ। हाम्रा विद्यार्थीहरूले शैक्षिक उत्कृष्टता हासिल गर्दै समाज विकासमा अग्रणी योगदान पुर्‍याइरहेका छन्।",
+        'chairman_en' => 'Jhakabir Khatri',
+        'chairman_np' => 'झकबिर खत्री',
+        'principal_en' => 'Mangal Khatri',
+        'principal_np' => 'मंगल खत्री',
+        'principal_message_en' => 'Welcome to Ishwari Secondary School. We are committed to supporting student learning and development.',
+        'principal_message_np' => 'ईश्वरी माध्यमिक विद्यालयको आधिकारिक वेब पोर्टलमा हार्दिक स्वागत छ। विद्यार्थीहरूको सिकाइ र सर्वाङ्गीण विकासमा हामी प्रतिबद्ध छौं।',
         'stats' => [
             ['value' => '1,240+', 'label_en' => 'Enrolled Students', 'label_np' => 'अध्ययनरत विद्यार्थी'],
             ['value' => '52', 'label_en' => 'Qualified Faculty', 'label_np' => 'योग्य शिक्षक तथा कर्मचारी'],
-            ['value' => '48', 'label_en' => 'Glorious Years', 'label_np' => 'गौरवमय इतिहास (वर्ष)'],
+            ['value' => '2028 B.S.', 'label_en' => 'Established', 'label_np' => 'स्थापना'],
             ['value' => '100%', 'label_en' => 'SEE Success Rate', 'label_np' => 'एसईई सफलता दर']
         ]
     ],
@@ -138,36 +140,18 @@ return [
     ],
     'staff' => [
         [
-            'name_en' => 'Mr. Narayan Prasad Koirala',
-            'name_np' => 'श्री नारायण प्रसाद कोइराला',
+            'name_en' => 'Mangal Khatri',
+            'name_np' => 'मंगल खत्री',
             'role' => 'principal',
-            'designation_en' => 'Headmaster / Principal (M.Ed, M.A.)',
-            'designation_np' => 'प्रधानाध्यापक (शिक्षाशास्त्र तथा कला स्नातकोत्तर)',
-            'experience' => '26 Years Experience'
+            'designation_en' => 'Principal',
+            'designation_np' => 'प्रधानाध्यापक'
         ],
         [
-            'name_en' => 'Mrs. Sharada Devi Sharma',
-            'name_np' => 'श्रीमती शारदा देवी शर्मा',
+            'name_en' => 'Bhim Bahadur Khatri',
+            'name_np' => 'भीम बहादुर खत्री',
             'role' => 'teacher',
-            'designation_en' => 'Senior Secondary Science Lead (M.Sc. Physics)',
-            'designation_np' => 'वरिष्ठ माध्यमिक विज्ञान संयोजक (भौतिकशास्त्र स्नातकोत्तर)',
-            'experience' => '18 Years Experience'
-        ],
-        [
-            'name_en' => 'Mr. Lokendra Bahadur Thapa',
-            'name_np' => 'श्री लोकेन्द्र बहादुर थापा',
-            'role' => 'teacher',
-            'designation_en' => 'Senior Mathematics Educator (M.Ed. Mathematics)',
-            'designation_np' => 'वरिष्ठ गणित विषय विशेषज्ञ',
-            'experience' => '15 Years Experience'
-        ],
-        [
-            'name_en' => 'Ms. Kamala Adhikari',
-            'name_np' => 'सुश्री कमला अधिकारी',
-            'role' => 'teacher',
-            'designation_en' => 'ICT & Computer Science Department Head',
-            'designation_np' => 'कम्प्युटर विज्ञान तथा सूचना प्रविधि विभाग प्रमुख',
-            'experience' => '9 Years Experience'
+            'designation_en' => 'Social Studies Teacher',
+            'designation_np' => 'सामाजिक अध्ययन शिक्षक'
         ]
     ],
     'documents' => [
@@ -211,7 +195,7 @@ return [
         ]
     ],
     'history' => [
-        ['year' => '2035 B.S.', 'title_en' => 'Establishment as Primary School', 'title_np' => 'प्राथमिक विद्यालयको रूपमा स्थापना'],
+        ['year' => '2028 B.S.', 'title_en' => 'Establishment as Primary School', 'title_np' => 'प्राथमिक विद्यालयको रूपमा स्थापना'],
         ['year' => '2048 B.S.', 'title_en' => 'Upgraded to Lower Secondary Level', 'title_np' => 'निम्न माध्यमिक तहमा स्तरोन्नति'],
         ['year' => '2058 B.S.', 'title_en' => 'Secondary Level Upgrade & First SLC Batch', 'title_np' => 'माध्यमिक तह (कक्षा १०) सञ्चालन तथा पहिलो एसएलसी ब्याच'],
         ['year' => '2072 B.S.', 'title_en' => 'Higher Secondary (+2) Science & Management Inception', 'title_np' => 'उच्च माध्यमिक (+२) विज्ञान तथा व्यवस्थापन संकाय सम्बन्धन'],
