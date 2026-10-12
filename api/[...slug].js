@@ -2045,6 +2045,7 @@ var outdatedSeedStaffNames = /* @__PURE__ */ new Set([
   "Ms. Kamala Adhikari"
 ]);
 var SCHOOL_FACTS_MIGRATION_VERSION = "school-facts-2028-v1";
+var ROLE_SESSION_HEARTBEAT_TIMEOUT_MS = 5 * 60 * 1e3;
 function migrateSchoolFacts(state) {
   const changedModules = /* @__PURE__ */ new Set();
   const school = state.school;
@@ -2343,8 +2344,13 @@ var CMSDatabaseManager = class {
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
       const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : void 0;
-      if (existingLock && Number(existingLock.expiresAt) > now) {
+      const lastHeartbeat = Number(existingLock?.updatedAt);
+      const hasRecentHeartbeat = Number.isFinite(lastHeartbeat) && lastHeartbeat > 0 && now - lastHeartbeat <= ROLE_SESSION_HEARTBEAT_TIMEOUT_MS;
+      if (existingLock && Number(existingLock.expiresAt) > now && hasRecentHeartbeat) {
         return false;
+      }
+      if (typeof existingLock?.tokenHash === "string") {
+        transaction.delete(doc(this.firestore, "sessions", existingLock.tokenHash));
       }
       transaction.set(lockRef, {
         tokenHash,
@@ -2476,22 +2482,21 @@ var CMSDatabaseManager = class {
   async destroySession(token) {
     if (!token) return false;
     this.revokedTokens.add(token);
-    const session = this.activeSessions.get(token) || verifyStatelessToken(token);
     this.activeSessions.delete(token);
     const sessionDocId = crypto2.createHash("sha256").update(token).digest("hex");
+    const tokenHash = sessionDocId;
+    const roleLockRefs = ["admin", "super_admin"].map(
+      (role) => doc(this.firestore, "session_role_locks", role)
+    );
     const deletions = [
-      deleteDoc(doc(this.firestore, "sessions", sessionDocId))
-    ];
-    if (session) {
-      const lockRef = doc(this.firestore, "session_role_locks", session.role);
-      const tokenHash = crypto2.createHash("sha256").update(token).digest("hex");
-      deletions.push(runTransaction(this.firestore, async (transaction) => {
+      deleteDoc(doc(this.firestore, "sessions", sessionDocId)),
+      ...roleLockRefs.map((lockRef) => runTransaction(this.firestore, async (transaction) => {
         const lockSnapshot = await transaction.get(lockRef);
         if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
           transaction.delete(lockRef);
         }
-      }));
-    }
+      }))
+    ];
     await Promise.all(deletions);
     return true;
   }
@@ -3557,22 +3562,17 @@ apiRouter.post("/auth/logout", async (req, res, next) => {
   let session;
   try {
     session = await db.validateSession(token);
+    await db.destroySession(token);
   } catch (err) {
-    next(err);
+    console.error("[Authentication] Could not release administrator session:", err);
+    res.status(503).json({
+      success: false,
+      error: "Unable to complete logout. Please try again."
+    });
     return;
   }
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "127.0.0.1";
   if (session) {
-    try {
-      await db.destroySession(token);
-    } catch (err) {
-      console.error("[Authentication] Could not release administrator session:", err);
-      res.status(503).json({
-        success: false,
-        error: "Unable to complete logout. Please try again."
-      });
-      return;
-    }
     db.appendAuditLog({
       action: "ADMIN_LOGOUT",
       actor: session.username,

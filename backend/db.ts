@@ -299,6 +299,7 @@ const outdatedSeedStaffNames = new Set([
   'Ms. Kamala Adhikari'
 ]);
 const SCHOOL_FACTS_MIGRATION_VERSION = 'school-facts-2028-v1';
+const ROLE_SESSION_HEARTBEAT_TIMEOUT_MS = 5 * 60 * 1000;
 
 function migrateSchoolFacts(state: CMSDatabaseState): Set<keyof CMSDatabaseState> {
   const changedModules = new Set<keyof CMSDatabaseState>();
@@ -651,10 +652,18 @@ class CMSDatabaseManager {
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
       const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
-      if (existingLock && Number(existingLock.expiresAt) > now) {
+      const lastHeartbeat = Number(existingLock?.updatedAt);
+      const hasRecentHeartbeat =
+        Number.isFinite(lastHeartbeat) &&
+        lastHeartbeat > 0 &&
+        now - lastHeartbeat <= ROLE_SESSION_HEARTBEAT_TIMEOUT_MS;
+      if (existingLock && Number(existingLock.expiresAt) > now && hasRecentHeartbeat) {
         return false;
       }
 
+      if (typeof existingLock?.tokenHash === 'string') {
+        transaction.delete(doc(this.firestore, 'sessions', existingLock.tokenHash));
+      }
       transaction.set(lockRef, {
         tokenHash,
         userId: account.id,
@@ -811,22 +820,21 @@ class CMSDatabaseManager {
   public async destroySession(token: string | undefined): Promise<boolean> {
     if (!token) return false;
     this.revokedTokens.add(token);
-    const session = this.activeSessions.get(token) || verifyStatelessToken(token);
     this.activeSessions.delete(token);
     const sessionDocId = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenHash = sessionDocId;
+    const roleLockRefs = ['admin', 'super_admin'].map((role) =>
+      doc(this.firestore, 'session_role_locks', role)
+    );
     const deletions: Promise<unknown>[] = [
-      deleteDoc(doc(this.firestore, 'sessions', sessionDocId))
-    ];
-    if (session) {
-      const lockRef = doc(this.firestore, 'session_role_locks', session.role);
-      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      deletions.push(runTransaction(this.firestore, async (transaction) => {
+      deleteDoc(doc(this.firestore, 'sessions', sessionDocId)),
+      ...roleLockRefs.map((lockRef) => runTransaction(this.firestore, async (transaction) => {
         const lockSnapshot = await transaction.get(lockRef);
         if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
           transaction.delete(lockRef);
         }
-      }));
-    }
+      }))
+    ];
     await Promise.all(deletions);
     return true;
   }

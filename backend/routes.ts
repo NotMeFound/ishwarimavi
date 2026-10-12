@@ -689,23 +689,18 @@ apiRouter.post('/auth/logout', async (req: Request, res: Response, next: NextFun
   let session: ServerSession | null;
   try {
     session = await db.validateSession(token);
+    await db.destroySession(token);
   } catch (err) {
-    next(err);
+    console.error('[Authentication] Could not release administrator session:', err);
+    res.status(503).json({
+      success: false,
+      error: 'Unable to complete logout. Please try again.'
+    });
     return;
   }
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
 
   if (session) {
-    try {
-      await db.destroySession(token);
-    } catch (err) {
-      console.error('[Authentication] Could not release administrator session:', err);
-      res.status(503).json({
-        success: false,
-        error: 'Unable to complete logout. Please try again.'
-      });
-      return;
-    }
     db.appendAuditLog({
       action: 'ADMIN_LOGOUT',
       actor: session.username,
