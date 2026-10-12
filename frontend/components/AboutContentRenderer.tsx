@@ -247,7 +247,7 @@ export const AboutContentRenderer: React.FC<AboutContentRendererProps> = ({
             onError={() => {
               setFailedImages((prev) => ({ ...prev, [img.url]: true }));
             }}
-            className="w-full h-auto object-cover max-h-[500px] mx-auto transition-transform duration-300 group-hover:scale-[1.01]"
+            className="w-full h-auto object-cover max-h-125 mx-auto transition-transform duration-300 group-hover:scale-[1.01]"
           />
         </div>
 

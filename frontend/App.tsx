@@ -423,12 +423,11 @@ export default function App() {
     });
   };
 
-  const handleUpdateGallery = (newVal: React.SetStateAction<GalleryItem[]>) => {
-    setGallery((prev) => {
-      const updated = typeof newVal === 'function' ? newVal(prev) : newVal;
-      apiClient.syncModule('gallery', updated, 'Administrator');
-      return updated;
-    });
+  const handleUpdateGallery = async (updated: GalleryItem[]): Promise<boolean> => {
+    const result = await apiClient.syncModule('gallery', updated, 'Administrator');
+    if (!result.success) return false;
+    setGallery(updated);
+    return true;
   };
 
   const handleUpdateSiteConfig = (newVal: React.SetStateAction<SiteCustomizerConfig>) => {

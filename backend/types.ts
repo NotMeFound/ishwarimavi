@@ -427,9 +427,13 @@ export interface GalleryItem {
   title_np: string;
   category: 'science' | 'sports' | 'academics' | 'culture' | 'community';
   iconType?: 'science' | 'sports' | 'academics' | 'culture' | 'community' | 'camera';
-  image?: string; // base64 or URL (< 1MB)
+  image?: string;
   url?: string;
   date?: string;
+  status?: 'published' | 'unpublished' | 'draft';
+  published?: boolean;
+  is_published?: boolean;
+  is_enabled?: boolean;
 }
 
 export type AdminRole = 'super_admin' | 'admin';
@@ -837,4 +841,3 @@ export interface SecurityAuditLogEntry {
   severity?: 'success' | 'warning' | 'danger' | 'info';
   details: string;
 }
-

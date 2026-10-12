@@ -2245,7 +2245,12 @@ var CMSDatabaseManager = class {
       events: s.events,
       achievements: s.achievements,
       history: (s.history || []).filter((item) => item.status !== "unpublished" && item.is_enabled !== false),
-      gallery: s.gallery,
+      gallery: (s.gallery || []).filter(
+        (item) => item.status !== "unpublished" && item.status !== "draft" && item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ).map((item) => ({
+        ...item,
+        image: item.image || item.url || ""
+      })),
       faqs: (s.faqs || initialFAQs).filter((item) => item.status !== "draft"),
       siteConfig: s.siteConfig,
       securityConfig: publicSecConfig,
@@ -2616,6 +2621,26 @@ var CMSDatabaseManager = class {
   async updateModule(moduleKey, data, actor = "Admin", ipAddress = "127.0.0.1", minVersion) {
     await this.ensureLoaded();
     const s = this.state;
+    if (moduleKey === "gallery" && Array.isArray(data)) {
+      data = await Promise.all(data.map(async (item) => {
+        if (typeof item?.image !== "string" || !item.image.startsWith("data:image/")) {
+          return item?.image || !item?.url ? item : { ...item, image: item.url };
+        }
+        const match = item.image.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([a-zA-Z0-9+/=]+)$/i);
+        if (!match) {
+          throw new Error(`Gallery photo ${item.id ?? ""} has an invalid image data URL`);
+        }
+        const content = Buffer.from(match[2], "base64");
+        if (!content.length || content.length > 1024 * 1024) {
+          throw new Error(`Gallery photo ${item.id ?? ""} exceeds the 1 MB image limit`);
+        }
+        const mimeType = match[1].toLowerCase();
+        const extension = mimeType === "image/jpeg" ? "jpg" : mimeType.slice("image/".length);
+        const filename = `gallery-${Date.now()}-${crypto2.randomBytes(8).toString("hex")}.${extension}`;
+        await this.saveUploadedFile(filename, "gallery", mimeType, content.toString("base64"), content.length);
+        return { ...item, image: `/api/gallery/file/${filename}` };
+      }));
+    }
     if (moduleKey === "adminAccounts" && Array.isArray(data)) {
       data = data.map((acc) => {
         const isBcrypt = acc.passwordHash?.startsWith("$2b$") || acc.passwordHash?.startsWith("$2a$");
@@ -2850,7 +2875,8 @@ var CMSDatabaseManager = class {
     return {
       base64Data,
       mimeType: data.mimeType || "application/octet-stream",
-      size: Number(data.size) || 0
+      size: Number(data.size) || 0,
+      category: String(data.category || "")
     };
   }
   async deleteUploadedFile(filename) {
@@ -3025,6 +3051,12 @@ apiRouter.get("/cms/state", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
+  try {
+    await db.ensureLoaded(true);
+  } catch (err) {
+    next(err);
+    return;
+  }
   const token = extractToken(req);
   let session;
   try {
@@ -3081,6 +3113,12 @@ apiRouter.get("/cms/state", async (req, res, next) => {
 apiRouter.get("/cms/version", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
   res.setHeader("Pragma", "no-cache");
+  try {
+    await db.ensureLoaded(true);
+  } catch (error) {
+    next(error);
+    return;
+  }
   const versionInfo = db.getVersion();
   res.json({
     success: true,
@@ -3091,8 +3129,14 @@ apiRouter.get("/cms/version", async (req, res, next) => {
 apiRouter.get("/notices", (req, res) => {
   res.json({ success: true, data: db.getState().notices || [] });
 });
-apiRouter.get("/gallery", (req, res) => {
-  res.json({ success: true, data: db.getState().gallery || [] });
+apiRouter.get("/gallery", async (req, res, next) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+  try {
+    await db.ensureLoaded(true);
+    res.json({ success: true, data: db.getPublicState().gallery || [] });
+  } catch (error) {
+    next(error);
+  }
 });
 apiRouter.get("/teachers", (req, res) => {
   res.json({ success: true, data: db.getState().staff || [] });
@@ -3907,6 +3951,7 @@ apiRouter.post("/contact/submit", async (req, res) => {
 });
 apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
   const { fileName, fileType, base64Data, category } = req.body;
+  const session = req.session;
   if (!base64Data || !fileName) {
     res.status(400).json({ success: false, error: "Missing file data or file name" });
     return;
@@ -4083,6 +4128,51 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
       mediaType
     });
     return;
+  } else if (category === "gallery") {
+    const galleryPermission = db.checkPermission(session, "gallery");
+    if (!galleryPermission.allowed || session.role !== "super_admin" && !session.permissions.includes("gallery.create")) {
+      res.status(403).json({ success: false, error: galleryPermission.reason || "Gallery create permission is required." });
+      return;
+    }
+    const ext = path.extname(fileName).toLowerCase();
+    const acceptedTypes = {
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp"
+    };
+    const mimeType = acceptedTypes[ext];
+    if (!mimeType || fileType && fileType.toLowerCase() !== mimeType) {
+      res.status(400).json({ success: false, error: "Gallery photos must be valid JPG, PNG, or WebP images." });
+      return;
+    }
+    if (sizeInBytes > 1024 * 1024) {
+      res.status(400).json({ success: false, error: "Gallery photos must not exceed 1 MB." });
+      return;
+    }
+    const isJpeg = mimeType === "image/jpeg" && buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255;
+    const isPng = mimeType === "image/png" && buffer.length >= 8 && buffer[0] === 137 && buffer.toString("ascii", 1, 4) === "PNG" && buffer[4] === 13 && buffer[5] === 10 && buffer[6] === 26 && buffer[7] === 10;
+    const isWebp = mimeType === "image/webp" && buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP";
+    if (!isJpeg && !isPng && !isWebp) {
+      res.status(400).json({ success: false, error: "The selected file is not a valid JPG, PNG, or WebP image." });
+      return;
+    }
+    const uniqueFileName = `gallery-${Date.now()}-${crypto3.randomBytes(12).toString("hex")}${ext}`;
+    try {
+      await db.saveUploadedFile(uniqueFileName, "gallery", mimeType, rawBase64, sizeInBytes);
+    } catch (error) {
+      console.error("[CMS Upload] Failed to persist gallery photo:", error);
+      res.status(503).json({ success: false, error: "Photo storage is temporarily unavailable. Please retry the upload." });
+      return;
+    }
+    res.json({
+      success: true,
+      url: `/api/gallery/file/${uniqueFileName}`,
+      fileName,
+      uniqueFileName,
+      size: sizeInBytes
+    });
+    return;
   } else {
     if (sizeInBytes > 5 * 1024 * 1024) {
       res.status(400).json({ success: false, error: "Image size exceeds maximum 5 MB limit" });
@@ -4103,6 +4193,52 @@ apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
     fileName,
     size: sizeInBytes
   });
+});
+apiRouter.get("/gallery/file/:filename", async (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!/^gallery-[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+    res.status(400).json({ success: false, error: "Invalid gallery image identifier" });
+    return;
+  }
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (!storedFile || storedFile.category !== "gallery" || !storedFile.mimeType.startsWith("image/")) {
+      res.status(404).json({ success: false, error: "Gallery image not found" });
+      return;
+    }
+    const content = Buffer.from(storedFile.base64Data, "base64");
+    res.setHeader("Content-Type", storedFile.mimeType);
+    res.setHeader("Content-Length", content.length);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+    res.end(content);
+  } catch (error) {
+    console.error("[CMS Gallery] Failed to retrieve gallery image:", error);
+    res.status(503).json({ success: false, error: "Gallery image storage is temporarily unavailable." });
+  }
+});
+apiRouter.delete("/gallery/file/:filename", requireAuth, async (req, res) => {
+  const session = req.session;
+  const galleryPermission = db.checkPermission(session, "gallery");
+  if (!galleryPermission.allowed || session.role !== "super_admin" && !session.permissions.includes("gallery.delete")) {
+    res.status(403).json({ success: false, error: galleryPermission.reason || "Gallery delete permission is required." });
+    return;
+  }
+  const filename = path.basename(req.params.filename);
+  if (!/^gallery-[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+    res.status(400).json({ success: false, error: "Invalid gallery image identifier" });
+    return;
+  }
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (storedFile?.category === "gallery") {
+      await db.deleteUploadedFile(filename);
+    }
+    res.json({ success: true, message: "Gallery image deleted" });
+  } catch (error) {
+    console.error("[CMS Gallery] Failed to delete gallery image:", error);
+    res.status(503).json({ success: false, error: "Gallery image storage is temporarily unavailable." });
+  }
 });
 apiRouter.get("/curriculum", async (req, res, next) => {
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");

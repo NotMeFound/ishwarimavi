@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { IconActionButton } from '../components/IconActionButton';
+import { getApiUrl } from '../services/apiClient';
 
 interface GalleryViewProps {
   lang: Language;
@@ -21,10 +22,17 @@ interface GalleryViewProps {
 export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [previewItem, setPreviewItem] = useState<GalleryItem | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<number>>(() => new Set());
   const isNp = lang === 'np';
   const t = (en: string, np: string) => (isNp ? np : en);
 
-  const safeItems = items || [];
+  const safeItems = (items || []).filter((item) =>
+    item.status !== 'unpublished' &&
+    item.status !== 'draft' &&
+    item.published !== false &&
+    item.is_published !== false &&
+    item.is_enabled !== false
+  );
   const renderIcon = (type: string) => {
     switch (type) {
       case 'science':
@@ -64,7 +72,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
               { id: 'science', en: 'Science & Tech', np: 'विज्ञान' },
               { id: 'sports', en: 'Sports', np: 'खेलकुद' },
               { id: 'academics', en: 'Academics', np: 'शिक्षा' },
-              { id: 'culture', en: 'Culture', np: 'संस्कृति' }
+              { id: 'culture', en: 'Culture', np: 'संस्कृति' },
+              { id: 'community', en: 'Community', np: 'समुदाय' }
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -81,8 +90,16 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
           </div>
         </div>
 
+        {filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+            {t('No published photos in this gallery yet.', 'यस ग्यालरीमा प्रकाशित तस्बिरहरू छैनन्।')}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((item) => (
+          {filtered.map((item) => {
+            const image = item.image || item.url || '';
+            const imageFailed = failedImages.has(item.id);
+            return (
             <div
               key={item.id}
               onClick={() => setPreviewItem(item)}
@@ -97,18 +114,20 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
               className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shadow-2xs flex flex-col hover:border-[#1E40AF]/40 transition group cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-[#1E40AF]"
             >
               <div className="h-48 bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center border-b border-slate-200 dark:border-slate-800 overflow-hidden relative">
-                {item.image && item.image.trim() ? (
+                {image && !imageFailed ? (
                   <img
-                    src={item.image}
-                    alt={item.title_en}
+                    src={getApiUrl(image)}
+                    alt={item.title_en || item.title_np || t('School gallery photo', 'विद्यालय ग्यालरी तस्बिर')}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
                     decoding="async"
+                    onError={() => setFailedImages((previous) => new Set(previous).add(item.id))}
                   />
                 ) : (
-                  <div className="group-hover:scale-105 transition-transform duration-300">
+                  <div className="group-hover:scale-105 transition-transform duration-300 flex flex-col items-center gap-2">
                     {renderIcon(item.iconType || 'camera')}
+                    {imageFailed && <span className="text-xs text-slate-500">{t('Image unavailable', 'तस्बिर उपलब्ध छैन')}</span>}
                   </div>
                 )}
               </div>
@@ -117,12 +136,14 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
                   {item.category}
                 </span>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-snug group-hover:text-[#1E40AF] dark:group-hover:text-blue-400 transition-colors">
-                  {t(item.title_en, item.title_np)}
+                  {t(item.title_en || item.title_np || 'School activity', item.title_np || item.title_en || 'विद्यालय गतिविधि')}
                 </h2>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
+        )}
 
         {/* Gallery Image Preview Lightbox */}
         {previewItem && (
@@ -157,11 +178,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
 
               <div className="px-4 pb-4">
                 <div className="max-h-[65vh] w-full rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center">
-                  {previewItem.image && previewItem.image.trim() ? (
+                  {(previewItem.image || previewItem.url) && !failedImages.has(previewItem.id) ? (
                     <img
-                      src={previewItem.image}
-                      alt={previewItem.title_en}
+                      src={getApiUrl(previewItem.image || previewItem.url || '')}
+                      alt={previewItem.title_en || previewItem.title_np || t('School gallery photo', 'विद्यालय ग्यालरी तस्बिर')}
                       className="max-h-[65vh] w-full object-contain"
+                      onError={() => setFailedImages((previous) => new Set(previous).add(previewItem.id))}
                     />
                   ) : (
                     <div className="py-20">

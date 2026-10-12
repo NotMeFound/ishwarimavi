@@ -539,7 +539,16 @@ class CMSDatabaseManager {
       events: s.events,
       achievements: s.achievements,
       history: (s.history || []).filter((item: any) => item.status !== 'unpublished' && item.is_enabled !== false),
-      gallery: s.gallery,
+      gallery: (s.gallery || []).filter((item: any) =>
+        item.status !== 'unpublished' &&
+        item.status !== 'draft' &&
+        item.published !== false &&
+        item.is_published !== false &&
+        item.is_enabled !== false
+      ).map((item: any) => ({
+        ...item,
+        image: item.image || item.url || ''
+      })),
       faqs: (s.faqs || initialFAQs).filter((item: any) => item.status !== 'draft'),
       siteConfig: s.siteConfig,
       securityConfig: publicSecConfig,
@@ -987,6 +996,29 @@ class CMSDatabaseManager {
     await this.ensureLoaded();
     const s = this.state;
 
+    if (moduleKey === 'gallery' && Array.isArray(data)) {
+      data = await Promise.all(data.map(async (item: any) => {
+        if (typeof item?.image !== 'string' || !item.image.startsWith('data:image/')) {
+          return item?.image || !item?.url ? item : { ...item, image: item.url };
+        }
+
+        const match = item.image.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([a-zA-Z0-9+/=]+)$/i);
+        if (!match) {
+          throw new Error(`Gallery photo ${item.id ?? ''} has an invalid image data URL`);
+        }
+        const content = Buffer.from(match[2], 'base64');
+        if (!content.length || content.length > 1024 * 1024) {
+          throw new Error(`Gallery photo ${item.id ?? ''} exceeds the 1 MB image limit`);
+        }
+
+        const mimeType = match[1].toLowerCase();
+        const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.slice('image/'.length);
+        const filename = `gallery-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`;
+        await this.saveUploadedFile(filename, 'gallery', mimeType, content.toString('base64'), content.length);
+        return { ...item, image: `/api/gallery/file/${filename}` };
+      }));
+    }
+
     // If updating adminAccounts, ensure all accounts have bcrypt-hashed passwords
     if (moduleKey === 'adminAccounts' && Array.isArray(data)) {
       data = data.map((acc: AdminAccount) => {
@@ -1245,7 +1277,7 @@ class CMSDatabaseManager {
     await batch.commit();
   }
 
-  public async getUploadedFile(filename: string): Promise<{ base64Data: string; mimeType: string; size: number } | null> {
+  public async getUploadedFile(filename: string): Promise<{ base64Data: string; mimeType: string; size: number; category: string } | null> {
     const fileRef = doc(this.firestore, 'uploaded_files', filename);
     const snap = await getDoc(fileRef);
     if (!snap.exists()) return null;
@@ -1269,7 +1301,8 @@ class CMSDatabaseManager {
     return {
       base64Data,
       mimeType: data.mimeType || 'application/octet-stream',
-      size: Number(data.size) || 0
+      size: Number(data.size) || 0,
+      category: String(data.category || '')
     };
   }
 

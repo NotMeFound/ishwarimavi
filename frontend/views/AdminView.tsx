@@ -140,7 +140,7 @@ interface AdminViewProps {
   history: HistoryItem[];
   onUpdateHistory: (history: HistoryItem[]) => void;
   gallery: GalleryItem[];
-  onUpdateGallery: (items: GalleryItem[]) => void;
+  onUpdateGallery: (items: GalleryItem[]) => Promise<boolean>;
   siteConfig: SiteCustomizerConfig;
   onUpdateSiteConfig: (config: SiteCustomizerConfig) => void;
   securityConfig: SecurityConfig;

@@ -152,7 +152,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium uppercase tracking-wider mb-0.5">
                 Target Record:
               </span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100 break-words">
+              <span className="font-semibold text-slate-900 dark:text-slate-100 wrap-break-word">
                 {itemName}
               </span>
             </div>
