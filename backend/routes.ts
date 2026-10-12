@@ -541,7 +541,7 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
         success: false,
         error: process.env.NODE_ENV === 'production' &&
           (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.trim().length < 32)
-          ? 'Administrator sign-in is temporarily unavailable. Please contact the site administrator.'
+          ? 'Administrator sign-in is not configured: set SESSION_SECRET to a random value of at least 32 characters in the backend host environment, then redeploy.'
           : 'Unable to verify administrator session availability. Please try again.'
       });
       return;
