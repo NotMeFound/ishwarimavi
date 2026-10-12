@@ -306,6 +306,8 @@ export const StaffView: React.FC<StaffViewProps> = ({ lang, staff }) => {
                       alt={member.name_en}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover object-top group-hover:scale-[1.02] transition-transform duration-300"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">

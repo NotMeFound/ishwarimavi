@@ -582,14 +582,14 @@ class APIClient {
    * Independent authoritative database fetch.
    * Never relies on admin browser state or local-only storage.
    */
-  public async fetchAuthoritativeState(forceRefresh = false): Promise<CMSStateResponse | null> {
+  public async fetchAuthoritativeState(forceRefresh = false, signal?: AbortSignal): Promise<CMSStateResponse | null> {
     if (this.stateFetchPromise) {
       if (!forceRefresh) return this.stateFetchPromise;
       await this.stateFetchPromise;
       if (this.stateFetchPromise) return this.stateFetchPromise;
     }
 
-    const request = this.requestAuthoritativeState();
+    const request = this.requestAuthoritativeState(signal);
     this.stateFetchPromise = request;
     try {
       return await request;
@@ -600,7 +600,7 @@ class APIClient {
     }
   }
 
-  private async requestAuthoritativeState(): Promise<CMSStateResponse | null> {
+  private async requestAuthoritativeState(signal?: AbortSignal): Promise<CMSStateResponse | null> {
     try {
       const url = getApiUrl('/api/cms/state');
       const res = await fetch(url, {
@@ -609,7 +609,8 @@ class APIClient {
           'Pragma': 'no-cache',
           ...this.getAuthHeaders()
         },
-        credentials: 'include'
+        credentials: 'include',
+        signal
       });
 
       if (!res.ok) {

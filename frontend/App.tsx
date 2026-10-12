@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useCallback, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GraduationCap, Sparkles } from 'lucide-react';
+import { GraduationCap, RefreshCw } from 'lucide-react';
 import {
   Language,
   ThemeMode,
@@ -57,23 +57,24 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
 import { ScrollProgressBackToTop } from './components/ScrollProgressBackToTop';
+import { PageLoadingSkeleton } from './components/PageLoadingSkeleton';
 
-import { HomeView } from './views/HomeView';
-import AboutView from './views/AboutView';
-import { AcademicsView } from './views/AcademicsView';
-import { FacilitiesView } from './views/FacilitiesView';
-import { StaffView } from './views/StaffView';
-import { NoticesView } from './views/NoticesView';
-import { EventsView } from './views/EventsView';
-import { AchievementsView } from './views/AchievementsView';
-import { HistoryView } from './views/HistoryView';
-import { DocumentsView } from './views/DocumentsView';
-import { GalleryView } from './views/GalleryView';
-import { CommunityView } from './views/CommunityView';
-import { ContactView } from './views/ContactView';
-import { CurriculumView } from './views/CurriculumView';
-import { AcademicCalendarView } from './views/AcademicCalendarView';
-import { AdminView } from './views/AdminView';
+const HomeView = lazy(() => import('./views/HomeView').then((module) => ({ default: module.HomeView })));
+const AboutView = lazy(() => import('./views/AboutView'));
+const AcademicsView = lazy(() => import('./views/AcademicsView').then((module) => ({ default: module.AcademicsView })));
+const FacilitiesView = lazy(() => import('./views/FacilitiesView').then((module) => ({ default: module.FacilitiesView })));
+const StaffView = lazy(() => import('./views/StaffView').then((module) => ({ default: module.StaffView })));
+const NoticesView = lazy(() => import('./views/NoticesView').then((module) => ({ default: module.NoticesView })));
+const EventsView = lazy(() => import('./views/EventsView').then((module) => ({ default: module.EventsView })));
+const AchievementsView = lazy(() => import('./views/AchievementsView').then((module) => ({ default: module.AchievementsView })));
+const HistoryView = lazy(() => import('./views/HistoryView').then((module) => ({ default: module.HistoryView })));
+const DocumentsView = lazy(() => import('./views/DocumentsView').then((module) => ({ default: module.DocumentsView })));
+const GalleryView = lazy(() => import('./views/GalleryView').then((module) => ({ default: module.GalleryView })));
+const CommunityView = lazy(() => import('./views/CommunityView'));
+const ContactView = lazy(() => import('./views/ContactView').then((module) => ({ default: module.ContactView })));
+const CurriculumView = lazy(() => import('./views/CurriculumView'));
+const AcademicCalendarView = lazy(() => import('./views/AcademicCalendarView').then((module) => ({ default: module.AcademicCalendarView })));
+const AdminView = lazy(() => import('./views/AdminView'));
 
 const normalizeRouteFromUrl = (): string => {
   if (typeof window === 'undefined') return 'home';
@@ -154,15 +155,10 @@ export default function App() {
   // 4. Search Modal State
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [hasLoadedAuthoritativeState, setHasLoadedAuthoritativeState] = useState(false);
-  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-
-  useEffect(() => {
-    if (hasLoadedAuthoritativeState) return;
-    const messageTimer = window.setInterval(() => {
-      setLoadingMessageIndex((index) => (index + 1) % 3);
-    }, 2400);
-    return () => window.clearInterval(messageTimer);
-  }, [hasLoadedAuthoritativeState]);
+  const [hasInitialLoadError, setHasInitialLoadError] = useState(false);
+  const [isInitialLoadSlow, setIsInitialLoadSlow] = useState(false);
+  const [isRetryingInitialLoad, setIsRetryingInitialLoad] = useState(false);
+  const [hasLogoLoadError, setHasLogoLoadError] = useState(false);
 
   // 5. Managed School Data & Records (React UI State backed Authoritatively by Database API)
   const [school, setSchool] = useState<SchoolData>(initialSchoolData);
@@ -189,12 +185,8 @@ export default function App() {
   const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>(() => loadAdminAccounts());
   const [faqs, setFaqs] = useState<SchoolFAQItem[]>(initialFAQs);
 
-  // Authoritative Database Sync: Fetch from backend API and listen for SSE live updates
-  useEffect(() => {
-    let isMounted = true;
-
-    const applyAuthoritativeData = (data: AuthoritativeCMSData) => {
-      if (!isMounted || !data) return;
+  const applyAuthoritativeData = useCallback((data: AuthoritativeCMSData) => {
+      if (!data) return;
       if (data.school) setSchool(data.school);
       if (data.aboutSections) setAboutSections(data.aboutSections);
       if (data.notices) setNotices(data.notices);
@@ -220,27 +212,41 @@ export default function App() {
       if (data.securityConfig) setSecurityConfig(data.securityConfig);
       if (data.auditLogs) setAuditLogs(data.auditLogs);
       if (data.adminAccounts) setAdminAccounts(data.adminAccounts);
-    };
+  }, []);
 
-    apiClient.fetchAuthoritativeState()
-      .then((res) => {
-        if (res?.data) {
-          applyAuthoritativeData(res.data);
-        }
-      })
-      .finally(() => {
-        if (isMounted) setHasLoadedAuthoritativeState(true);
-      });
+  const loadAuthoritativeState = useCallback(async () => {
+    const controller = new AbortController();
+    setHasInitialLoadError(false);
+    setIsInitialLoadSlow(false);
+    setIsRetryingInitialLoad(true);
+    const slowTimer = window.setTimeout(() => setIsInitialLoadSlow(true), 4000);
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
 
-    const cleanupLiveSync = apiClient.setupLiveSync((data) => {
-      applyAuthoritativeData(data);
-    });
+    try {
+      const res = await apiClient.fetchAuthoritativeState(false, controller.signal);
+      if (res?.data) {
+        applyAuthoritativeData(res.data);
+      } else {
+        setHasInitialLoadError(true);
+      }
+    } catch {
+      setHasInitialLoadError(true);
+    } finally {
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(timeout);
+      setIsRetryingInitialLoad(false);
+      setHasLoadedAuthoritativeState(true);
+    }
+  }, [applyAuthoritativeData]);
 
+  // Fetch authoritative CMS data once and subscribe to subsequent server updates.
+  useEffect(() => {
+    void loadAuthoritativeState();
+    const cleanupLiveSync = apiClient.setupLiveSync(applyAuthoritativeData);
     return () => {
-      isMounted = false;
       cleanupLiveSync();
     };
-  }, []);
+  }, [applyAuthoritativeData, loadAuthoritativeState]);
 
   // Listen to popstate and hashchange for clean HTML5 URL routing (/admin, /superadmin, /about)
   useEffect(() => {
@@ -562,10 +568,6 @@ export default function App() {
   }, [isAdminRoute]);
 
   if (!hasLoadedAuthoritativeState) {
-    const loadingMessages = lang === 'np'
-      ? ['नवीनतम विद्यालय जानकारी ल्याउँदैछौँ', 'विद्यालयका स्रोतहरू तयार गर्दैछौँ', 'तपाईंको पोर्टल तयार हुँदैछ']
-      : ['Fetching the latest school information', 'Preparing school resources', 'Getting your portal ready'];
-
     return (
       <div
         className="relative min-h-screen overflow-hidden flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 px-5"
@@ -582,56 +584,50 @@ export default function App() {
           className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-8 text-center shadow-[0_24px_80px_-32px_rgba(30,58,138,0.35)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/75 sm:p-10"
         >
           <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent" />
-          <div className="relative mx-auto mb-7 flex h-28 w-28 items-center justify-center">
-            <div className="absolute inset-1 rounded-full border border-blue-200/70 dark:border-blue-900/70" />
-            <div className="absolute inset-1 animate-spin rounded-full border-2 border-transparent border-t-blue-500 motion-reduce:animate-none" />
-            <div className="absolute inset-3 animate-[spin_4s_linear_infinite_reverse] rounded-full border border-dashed border-amber-400/70 motion-reduce:animate-none" />
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl bg-linear-to-br from-[#1E3A8A] via-[#1E40AF] to-[#0F172A] text-amber-300 shadow-lg shadow-blue-900/20"
-            >
-              <GraduationCap className="h-9 w-9" strokeWidth={1.7} aria-hidden="true" />
-            </motion.div>
-            <Sparkles className="absolute right-0 top-3 h-4 w-4 text-amber-500" aria-hidden="true" />
-            <Sparkles className="absolute bottom-2 left-0 h-3.5 w-3.5 text-blue-500/70" aria-hidden="true" />
+          <div className="mx-auto mb-7 flex min-h-24 items-center justify-center">
+            {school.logo_url && !hasLogoLoadError ? (
+              <img
+                src={school.logo_url}
+                alt={school.name_en || 'Shree Ishwari Secondary School logo'}
+                onError={() => setHasLogoLoadError(true)}
+                className="h-24 max-w-40 object-contain sm:max-w-48"
+              />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#1E3A8A] text-amber-300 shadow-md">
+                <GraduationCap className="h-10 w-10" strokeWidth={1.7} aria-hidden="true" />
+              </div>
+            )}
           </div>
 
           <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
             {lang === 'np' ? 'श्री ईश्वरी माध्यमिक विद्यालय' : 'Shree Ishwari Secondary School'}
           </p>
           <h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-            {lang === 'np' ? 'स्वागत छ' : 'Welcome'}
+            {lang === 'np' ? 'तपाईंको विद्यालय अनुभव तयार गर्दैछौँ' : 'Preparing your school experience…'}
           </h1>
-          <div className="mt-5 flex min-h-6 items-center justify-center gap-2" aria-live="polite">
-            <motion.span
-              key={loadingMessageIndex}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-sm font-medium text-slate-600 dark:text-slate-300"
-            >
-              {loadingMessages[loadingMessageIndex]}
-            </motion.span>
+          <div className="mt-5 flex min-h-6 items-center justify-center gap-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              {lang === 'np' ? 'विद्यालयको सामग्री ल्याउँदैछौँ' : 'Loading the latest school information'}
+            </span>
             <span className="flex gap-1" aria-hidden="true">
               {[0, 1, 2].map((dot) => (
-                <motion.span
+                <span
                   key={dot}
-                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
-                  transition={{ duration: 0.9, repeat: Infinity, delay: dot * 0.16 }}
-                  className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400"
+                  className={`h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 ${dot === 1 ? 'motion-safe:animate-pulse' : ''}`}
                 />
               ))}
             </span>
           </div>
+          {isInitialLoadSlow && (
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              {lang === 'np' ? 'अझै केही समय लाग्दैछ…' : 'This is taking a little longer than usual…'}
+            </p>
+          )}
 
           <div className="mt-7 h-1.5 overflow-hidden rounded-full bg-blue-100 dark:bg-slate-800" aria-hidden="true">
-            <motion.div
-              className="h-full w-1/3 rounded-full bg-linear-to-r from-blue-700 via-blue-500 to-amber-400"
-              animate={{ x: ['-100%', '300%'] }}
-              transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
-            />
+            <div className="h-full w-1/3 rounded-full bg-[#1E40AF] motion-safe:animate-pulse motion-reduce:animate-none" />
           </div>
-          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500" aria-hidden="true">
             {lang === 'np' ? 'केही क्षण पर्खनुहोस्' : 'Just a few moments'}
           </p>
         </motion.div>
@@ -643,6 +639,7 @@ export default function App() {
   if (isAdminRoute) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-[#1E40AF] selection:text-white">
+        <Suspense fallback={<PageLoadingSkeleton lang={lang} variant="admin" />}>
         <AdminView
           lang={lang}
           theme={theme}
@@ -691,6 +688,7 @@ export default function App() {
           onResetData={handleResetData}
           onNavigateHome={() => handleRouteChange('home')}
         />
+        </Suspense>
       </div>
     );
   }
@@ -723,6 +721,23 @@ export default function App() {
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className="w-full"
           >
+            {hasInitialLoadError && (
+              <div className="mx-auto mb-4 flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" role="status" aria-live="polite">
+                <span>{lang === 'np' ? 'नवीनतम सामग्री ल्याउन सकिएन। देखाइएको सामग्री पुरानो हुन सक्छ।' : 'Could not load the latest school content. The displayed information may be out of date.'}</span>
+                <button
+                  type="button"
+                  onClick={() => void loadAuthoritativeState()}
+                  disabled={isRetryingInitialLoad}
+                  className="inline-flex items-center gap-2 rounded-md border border-current px-3 py-1.5 font-semibold disabled:cursor-wait disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRetryingInitialLoad ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />
+                  {isRetryingInitialLoad
+                    ? (lang === 'np' ? 'पुनः प्रयास गर्दैछौँ…' : 'Retrying…')
+                    : (lang === 'np' ? 'पुनः प्रयास' : 'Retry')}
+                </button>
+              </div>
+            )}
+            <Suspense fallback={<PageLoadingSkeleton lang={lang} variant={activeRoute === 'admin' ? 'admin' : activeRoute === 'home' ? 'home' : 'content'} />}>
             {activeRoute === 'home' && (
               <HomeView
                 lang={lang}
@@ -815,6 +830,7 @@ export default function App() {
                 onSendMessage={handleAddMessage}
               />
             )}
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </main>

@@ -103,6 +103,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
                     alt={item.title_en}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="group-hover:scale-105 transition-transform duration-300">

@@ -186,6 +186,8 @@ const TimelineMilestoneItem: React.FC<TimelineMilestoneItemProps> = ({
                 src={item.image}
                 alt={milestoneTitle}
                 className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 cursor-pointer"
+                loading="lazy"
+                decoding="async"
                 onClick={() => onOpenLightbox({ url: item.image!, title: milestoneTitle, caption })}
               />
             </div>
