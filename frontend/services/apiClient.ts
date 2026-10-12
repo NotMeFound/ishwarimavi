@@ -479,6 +479,45 @@ class APIClient {
     return { authenticated: false };
   }
 
+  public async refreshAuthSession(): Promise<{
+    success: boolean;
+    authenticated: boolean;
+    sessionExpiresAt?: number;
+  }> {
+    try {
+      const res = await fetch(getApiUrl('/api/auth/refresh'), {
+        method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache',
+          ...this.getAuthHeaders()
+        },
+        credentials: 'include'
+      });
+      const data = await safeParseJson<{
+        success?: boolean;
+        authenticated?: boolean;
+        token?: string;
+        sessionExpiresAt?: number;
+      }>(res);
+
+      if (res.ok && data?.success && data.authenticated && data.token) {
+        this.setToken(data.token);
+        return {
+          success: true,
+          authenticated: true,
+          sessionExpiresAt: data.sessionExpiresAt
+        };
+      }
+
+      return {
+        success: res.status === 401,
+        authenticated: false
+      };
+    } catch {
+      return { success: false, authenticated: false };
+    }
+  }
+
   /**
    * Terminate active session on server and invalidate tokens
    */

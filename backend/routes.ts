@@ -653,6 +653,36 @@ apiRouter.get('/auth/me', async (req: Request, res: Response, next: NextFunction
   });
 });
 
+apiRouter.post('/auth/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  const token = extractToken(req);
+  let session: ServerSession | null;
+  try {
+    session = await db.refreshSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
+
+  if (!session) {
+    res.status(401).json({ success: false, authenticated: false, error: 'Session invalid or expired.' });
+    return;
+  }
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('ishwari_session', session.token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    maxAge: Math.max(0, session.expiresAt - Date.now())
+  });
+  res.json({
+    success: true,
+    authenticated: true,
+    token: session.token,
+    sessionExpiresAt: session.expiresAt
+  });
+});
+
 // 7. Secure Logout & Invalidation
 apiRouter.post('/auth/logout', async (req: Request, res: Response, next: NextFunction) => {
   const token = extractToken(req);

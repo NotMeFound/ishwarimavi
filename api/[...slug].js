@@ -2304,6 +2304,63 @@ var CMSDatabaseManager = class {
     }
     return session;
   }
+  async refreshSession(token) {
+    const session = await this.validateSession(token);
+    if (!session || !token) return null;
+    const now = Date.now();
+    const timeoutMinutes = this.state.securityConfig?.sessionTimeoutMinutes || 60;
+    const expiresAt = now + Math.max(1, timeoutMinutes) * 60 * 1e3;
+    const { token: previousToken, ...sessionData } = session;
+    const refreshedSessionData = {
+      ...sessionData,
+      lastActivity: now,
+      expiresAt
+    };
+    const refreshedSession = {
+      ...refreshedSessionData,
+      token: signStatelessToken(refreshedSessionData)
+    };
+    const previousTokenHash = crypto2.createHash("sha256").update(previousToken).digest("hex");
+    const refreshedTokenHash = crypto2.createHash("sha256").update(refreshedSession.token).digest("hex");
+    const lockRef = doc(this.firestore, "session_role_locks", session.role);
+    const claimed = await runTransaction(this.firestore, async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : void 0;
+      if (!existingLock || existingLock.tokenHash !== previousTokenHash || Number(existingLock.expiresAt) <= now) {
+        return false;
+      }
+      transaction.set(lockRef, {
+        ...existingLock,
+        tokenHash: refreshedTokenHash,
+        expiresAt,
+        updatedAt: now
+      });
+      return true;
+    });
+    if (!claimed) return null;
+    const previousSessionDocId = previousTokenHash;
+    const refreshedSessionDocId = refreshedTokenHash;
+    Promise.all([
+      deleteDoc(doc(this.firestore, "sessions", previousSessionDocId)),
+      setDoc(doc(this.firestore, "sessions", refreshedSessionDocId), {
+        token: refreshedSession.token,
+        userId: refreshedSession.userId,
+        username: refreshedSession.username,
+        fullName: refreshedSession.fullName,
+        role: refreshedSession.role,
+        permissions: refreshedSession.permissions,
+        createdAt: refreshedSession.createdAt,
+        lastActivity: refreshedSession.lastActivity,
+        expiresAt,
+        ip: refreshedSession.ip,
+        userAgent: refreshedSession.userAgent
+      })
+    ]).catch((error) => console.warn("[Firestore Sessions] Refresh persistence warning:", error));
+    this.activeSessions.delete(previousToken);
+    this.revokedTokens.add(previousToken);
+    this.activeSessions.set(refreshedSession.token, refreshedSession);
+    return refreshedSession;
+  }
   async destroySession(token) {
     if (!token) return false;
     this.revokedTokens.add(token);
@@ -3353,6 +3410,33 @@ apiRouter.get("/auth/me", async (req, res, next) => {
       status: account.status,
       lastLogin: account.lastLogin
     },
+    sessionExpiresAt: session.expiresAt
+  });
+});
+apiRouter.post("/auth/refresh", async (req, res, next) => {
+  const token = extractToken(req);
+  let session;
+  try {
+    session = await db.refreshSession(token);
+  } catch (err) {
+    next(err);
+    return;
+  }
+  if (!session) {
+    res.status(401).json({ success: false, authenticated: false, error: "Session invalid or expired." });
+    return;
+  }
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("ishwari_session", session.token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+    maxAge: Math.max(0, session.expiresAt - Date.now())
+  });
+  res.json({
+    success: true,
+    authenticated: true,
+    token: session.token,
     sessionExpiresAt: session.expiresAt
   });
 });

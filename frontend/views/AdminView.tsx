@@ -402,9 +402,35 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let refreshInProgress = false;
+    const refreshSession = async () => {
+      if (refreshInProgress) return;
+      refreshInProgress = true;
+      const result = await apiClient.refreshAuthSession();
+      refreshInProgress = false;
+
+      if (result.authenticated) {
+        setSessionTimeLeft((securityConfig?.sessionTimeoutMinutes || 30) * 60);
+      } else if (result.success) {
+        window.dispatchEvent(new CustomEvent('ishwari:session-expired', {
+          detail: { message: 'Session expired. Please log in again.' }
+        }));
+      }
+    };
+
+    const interval = setInterval(() => {
+      void refreshSession();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, securityConfig?.sessionTimeoutMinutes]);
+
+  useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'ishwari_active_session_lock') {
         if (!e.newValue && isAuthenticated) {
+          apiClient.setToken(null);
           setIsAuthenticated(false);
           setCurrentAccount(null);
           safeSessionStorage.removeItem('ishwari_admin_auth');
@@ -421,6 +447,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     window.addEventListener('storage', handleStorage);
 
     const handleSessionExpired = (e: any) => {
+      apiClient.setToken(null);
       setIsAuthenticated(false);
       setCurrentAccount(null);
       safeSessionStorage.removeItem('ishwari_admin_auth');
@@ -438,36 +465,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
     };
   }, [isAuthenticated, lang]);
 
-  // Session Timeout countdown
-
-  // Session Timeout countdown
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number>(
     (securityConfig?.sessionTimeoutMinutes || 30) * 60
   );
 
-  // Clock ticker for lockout & session timeout
+  // Display the configured session expiry; the server session is renewed while the panel stays open.
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
       if (isAuthenticated) {
         setSessionTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Auto logout
-            setIsAuthenticated(false);
-            safeSessionStorage.removeItem('ishwari_admin_auth');
-            setAuthError(
-              lang === 'np'
-                ? 'निष्क्रियताका कारण सुरक्षा सत्र समाप्त भयो। कृपया पुनः लगइन गर्नुहोस्।'
-                : 'Session expired due to inactivity. Please log in again.'
-            );
-            return (securityConfig?.sessionTimeoutMinutes || 30) * 60;
-          }
-          return prev - 1;
+          return Math.max(0, prev - 1);
         });
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [isAuthenticated, lang, securityConfig?.sessionTimeoutMinutes]);
+  }, [isAuthenticated]);
 
   const isLockedOut = lockoutUntil > now;
   const lockoutSecondsRemaining = isLockedOut ? Math.ceil((lockoutUntil - now) / 1000) : 0;
