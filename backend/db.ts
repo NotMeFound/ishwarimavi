@@ -187,14 +187,18 @@ export function verifyPasswordBcrypt(password: string, hash: string): boolean {
   return password === hash;
 }
 
-// Secure Session Token Signing:
-// Production uses process.env.SESSION_SECRET. In serverless/container environments without it,
-// generate a high-entropy cryptographically secure runtime secret to prevent static development fallback vulnerability.
+// A process-local key cannot validate sessions across serverless instances or restarts.
 const RUNTIME_CRYPTO_SECRET = crypto.randomBytes(32).toString('hex');
 export function getSessionSigningSecret(): string {
-  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
-    return process.env.SESSION_SECRET.trim();
+  const configuredSecret = process.env.SESSION_SECRET?.trim();
+  if (configuredSecret && configuredSecret.length >= 32) {
+    return configuredSecret;
   }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be configured with at least 32 characters in production.');
+  }
+
   return RUNTIME_CRYPTO_SECRET;
 }
 

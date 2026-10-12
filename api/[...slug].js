@@ -1944,8 +1944,12 @@ function verifyPasswordBcrypt(password, hash) {
 }
 var RUNTIME_CRYPTO_SECRET = crypto2.randomBytes(32).toString("hex");
 function getSessionSigningSecret() {
-  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
-    return process.env.SESSION_SECRET.trim();
+  const configuredSecret = process.env.SESSION_SECRET?.trim();
+  if (configuredSecret && configuredSecret.length >= 32) {
+    return configuredSecret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be configured with at least 32 characters in production.");
   }
   return RUNTIME_CRYPTO_SECRET;
 }
@@ -3430,7 +3434,7 @@ var handleAdminLogin = async (req, res) => {
       console.error("[Authentication] Could not reserve role session:", err);
       res.status(503).json({
         success: false,
-        error: "Unable to verify administrator session availability. Please try again."
+        error: process.env.NODE_ENV === "production" && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.trim().length < 32) ? "Administrator sign-in is temporarily unavailable. Please contact the site administrator." : "Unable to verify administrator session availability. Please try again."
       });
       return;
     }
