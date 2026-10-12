@@ -315,9 +315,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
       }
     };
 
+    const handlePageShow = async (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      const res = await apiClient.checkAuth();
+      if (!isMounted || res.authenticated) return;
+
+      setIsAuthenticated(false);
+      setCurrentAccount(null);
+      safeSessionStorage.removeItem('ishwari_admin_auth');
+      safeSessionStorage.removeItem('ishwari_current_account');
+      safeSessionStorage.removeItem('ishwari_my_session_id');
+      releaseSessionLock();
+      setAuthError(
+        lang === 'np'
+          ? 'प्रशासनिक सत्र लगआउट गरिएको छ। पुनः लगइन गर्नुहोस्।'
+          : 'You left the admin panel. Please log in again.'
+      );
+    };
+
     verifyServerSession();
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       isMounted = false;
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
 
@@ -2278,4 +2298,3 @@ export const AdminView: React.FC<AdminViewProps> = ({
 };
 
 export default AdminView;
-

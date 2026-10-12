@@ -482,20 +482,21 @@ class APIClient {
   /**
    * Terminate active session on server and invalidate tokens
    */
-  public async logout(): Promise<boolean> {
+  public async logout(options: { keepalive?: boolean } = {}): Promise<boolean> {
     try {
       const url = getApiUrl('/api/auth/logout');
-      await fetch(url, {
+      const logoutRequest = fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...this.getAuthHeaders()
         },
-        credentials: 'include'
+        credentials: 'include',
+        keepalive: options.keepalive
       });
+      this.setToken(null);
+      await logoutRequest;
     } catch {
-      // Ignore network errors on logout
-    } finally {
       this.setToken(null);
     }
     return true;

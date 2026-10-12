@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Language,
@@ -28,8 +28,8 @@ import {
   Vacancy,
   SchoolFAQItem
 } from './types';
-import { loadAdminAccounts, saveAdminAccounts } from './utils/security';
-import { safeStorage } from './utils/storage';
+import { loadAdminAccounts, saveAdminAccounts, releaseSessionLock } from './utils/security';
+import { safeStorage, safeSessionStorage } from './utils/storage';
 import { apiClient, AuthoritativeCMSData } from './services/apiClient';
 import {
   initialSchoolData,
@@ -522,6 +522,29 @@ export default function App() {
     activeRoute === adminSlug ||
     activeRoute.startsWith('admin/') ||
     activeRoute.startsWith('superadmin/');
+
+  const wasAdminRoute = useRef(isAdminRoute);
+  const terminateAdminSession = () => {
+    void apiClient.logout({ keepalive: true });
+    releaseSessionLock();
+    safeSessionStorage.removeItem('ishwari_admin_auth');
+    safeSessionStorage.removeItem('ishwari_current_account');
+    safeSessionStorage.removeItem('ishwari_my_session_id');
+  };
+
+  useEffect(() => {
+    if (wasAdminRoute.current && !isAdminRoute) {
+      terminateAdminSession();
+    }
+    wasAdminRoute.current = isAdminRoute;
+  }, [isAdminRoute]);
+
+  useEffect(() => {
+    if (!isAdminRoute) return;
+    const handlePageHide = () => terminateAdminSession();
+    window.addEventListener('pagehide', handlePageHide);
+    return () => window.removeEventListener('pagehide', handlePageHide);
+  }, [isAdminRoute]);
 
   // When on Admin Route, isolate the view completely (no public header, footer, or search modal)
   if (isAdminRoute) {
