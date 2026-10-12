@@ -539,10 +539,7 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
       console.error('[Authentication] Could not reserve role session:', err);
       res.status(503).json({
         success: false,
-        error: process.env.NODE_ENV === 'production' &&
-          (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.trim().length < 32)
-          ? 'Administrator sign-in is not configured: set SESSION_SECRET to a random value of at least 32 characters in the backend host environment, then redeploy.'
-          : 'Unable to verify administrator session availability. Please try again.'
+        error: 'Unable to verify administrator session availability. Please try again.'
       });
       return;
     }

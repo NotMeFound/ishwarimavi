@@ -84,11 +84,10 @@ ishwari-secondary-school/
   - Compiles frontend client assets via `vite build`.
   - Compiles `backend/server.ts` into both `dist/server.js` (ESM) and `dist/server.cjs` (CJS) via `esbuild`.
 - **Start Command**: `npm start` (or `bun run start`), which runs `node dist/server.js` or `node dist/server.cjs`.
-- **Environment**: Set `NODE_ENV=production`, `FRONTEND_URL` for CORS, and
-  `SESSION_SECRET` to the same randomly generated value (at least 32 characters)
-  on every backend instance. Generate it with `openssl rand -hex 32`; do not
-  commit it. Production authentication is disabled if this shared secret is missing
-  because process-local signing keys cause sessions to fail across server instances.
+- **Environment**: Set `NODE_ENV=production` and `FRONTEND_URL` for CORS.
+  Admin sessions use cryptographically random opaque tokens whose hashes and
+  role locks are stored atomically in Firestore, so session validity is shared
+  across backend instances and does not depend on a per-process signing key.
 
 ### Vercel (Frontend React SPA)
 - **Framework**: Vite

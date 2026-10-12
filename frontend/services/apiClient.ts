@@ -302,6 +302,16 @@ class APIClient {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  private expireSessionForToken(requestToken: string | null): void {
+    if (!requestToken || this.getToken() !== requestToken) return;
+    this.setToken(null);
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      window.dispatchEvent(new CustomEvent('ishwari:session-expired', {
+        detail: { message: 'Session expired. Please log in again.' }
+      }));
+    }
+  }
+
   /**
    * Test internal same-origin backend health status
    */
@@ -463,7 +473,12 @@ class APIClient {
   /**
    * Check active authenticated session against server
    */
-  public async checkAuth(): Promise<{ authenticated: boolean; account?: AdminAccount; sessionExpiresAt?: number }> {
+  public async checkAuth(): Promise<{
+    authenticated: boolean;
+    invalid?: boolean;
+    account?: AdminAccount;
+    sessionExpiresAt?: number;
+  }> {
     try {
       const url = getApiUrl('/api/auth/me');
       const res = await fetch(url, {
@@ -477,19 +492,20 @@ class APIClient {
         const data = await safeParseJson(res);
         if (data && data.authenticated) return data;
       }
+      return { authenticated: false, invalid: res.status === 401 };
     } catch {
-      return { authenticated: false };
+      return { authenticated: false, invalid: false };
     }
-
-    return { authenticated: false };
   }
 
   public async refreshAuthSession(): Promise<{
     success: boolean;
     authenticated: boolean;
     sessionExpiresAt?: number;
+    expiredToken?: string;
   }> {
     const refresh = async () => {
+      const requestToken = this.getToken();
       const res = await fetch(getApiUrl('/api/auth/refresh'), {
         method: 'POST',
         headers: {
@@ -515,8 +531,11 @@ class APIClient {
       }
 
       return {
-        success: res.status === 401,
-        authenticated: false
+        success: res.status === 401 && this.getToken() === requestToken,
+        authenticated: false,
+        expiredToken: res.status === 401 && this.getToken() === requestToken
+          ? requestToken || undefined
+          : undefined
       };
     };
 
@@ -695,10 +714,7 @@ class APIClient {
       const json = await safeParseJson(res);
 
       if (res.status === 401) {
-        this.setToken(null);
-        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
-          window.dispatchEvent(new CustomEvent('ishwari:session-expired', { detail: { message: 'Session expired. Please log in again.' } }));
-        }
+        this.expireSessionForToken(token);
         return { success: false, error: 'Session expired (HTTP 401). Please log in again.' };
       }
 
@@ -767,10 +783,7 @@ class APIClient {
       const json = await safeParseJson(res);
 
       if (res.status === 401) {
-        this.setToken(null);
-        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
-          window.dispatchEvent(new CustomEvent('ishwari:session-expired', { detail: { message: 'Session expired. Please log in again.' } }));
-        }
+        this.expireSessionForToken(token);
         return { success: false, error: 'Session expired (HTTP 401). Please log in again.' };
       }
 

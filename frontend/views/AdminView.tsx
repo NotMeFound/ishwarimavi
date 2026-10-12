@@ -317,8 +317,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const handlePageShow = async (event: PageTransitionEvent) => {
       if (!event.persisted) return;
+      const checkedToken = apiClient.getToken();
       const res = await apiClient.checkAuth();
-      if (!isMounted || res.authenticated) return;
+      if (
+        !isMounted ||
+        res.authenticated ||
+        !res.invalid ||
+        (checkedToken !== apiClient.getToken() && apiClient.getToken())
+      ) return;
 
       setIsAuthenticated(false);
       setCurrentAccount(null);
@@ -413,7 +419,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
       if (result.authenticated) {
         setSessionTimeLeft((securityConfig?.sessionTimeoutMinutes || 30) * 60);
-      } else if (result.success) {
+      } else if (
+        result.success &&
+        result.expiredToken &&
+        apiClient.getToken() === result.expiredToken
+      ) {
         window.dispatchEvent(new CustomEvent('ishwari:session-expired', {
           detail: { message: 'Session expired. Please log in again.' }
         }));

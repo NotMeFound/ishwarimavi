@@ -187,73 +187,6 @@ export function verifyPasswordBcrypt(password: string, hash: string): boolean {
   return password === hash;
 }
 
-// A process-local key cannot validate sessions across serverless instances or restarts.
-const RUNTIME_CRYPTO_SECRET = crypto.randomBytes(32).toString('hex');
-export function getSessionSigningSecret(): string {
-  const configuredSecret = process.env.SESSION_SECRET?.trim();
-  if (configuredSecret && configuredSecret.length >= 32) {
-    return configuredSecret;
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('SESSION_SECRET must be configured with at least 32 characters in production.');
-  }
-
-  return RUNTIME_CRYPTO_SECRET;
-}
-
-export function signStatelessToken(session: Omit<ServerSession, 'token'>): string {
-  const payload = JSON.stringify({
-    userId: session.userId,
-    username: session.username,
-    fullName: session.fullName,
-    role: session.role,
-    permissions: session.permissions,
-    createdAt: session.createdAt,
-    expiresAt: session.expiresAt,
-    ip: session.ip
-  });
-  const b64Payload = Buffer.from(payload, 'utf8').toString('base64url');
-  const hmac = crypto.createHmac('sha256', getSessionSigningSecret()).update(b64Payload).digest('base64url');
-  return `iss.${b64Payload}.${hmac}`;
-}
-
-export function verifyStatelessToken(token: string): ServerSession | null {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length !== 3 || parts[0] !== 'iss') return null;
-  const [_, b64Payload, signature] = parts;
-  try {
-    const expectedHmac = crypto.createHmac('sha256', getSessionSigningSecret()).update(b64Payload).digest('base64url');
-    const sigBuf = Buffer.from(signature);
-    const expBuf = Buffer.from(expectedHmac);
-    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-      return null;
-    }
-    const raw = Buffer.from(b64Payload, 'base64url').toString('utf8');
-    const data = JSON.parse(raw);
-    const now = Date.now();
-    if (now > data.expiresAt) {
-      return null;
-    }
-    return {
-      token,
-      userId: data.userId,
-      username: data.username,
-      fullName: data.fullName,
-      role: data.role,
-      permissions: data.permissions || [],
-      createdAt: data.createdAt,
-      lastActivity: now,
-      expiresAt: data.expiresAt,
-      ip: data.ip || '127.0.0.1',
-      userAgent: 'Verified Session'
-    };
-  } catch {
-    return null;
-  }
-}
-
 export const FIREBASE_CONFIG = {
   projectId: 'imposing-practice-w6tvw',
   appId: '1:801110298190:web:8caf18bf341076c7a8bd1f',
@@ -303,8 +236,6 @@ const outdatedSeedStaffNames = new Set([
   'Ms. Kamala Adhikari'
 ]);
 const SCHOOL_FACTS_MIGRATION_VERSION = 'school-facts-2028-v1';
-const ROLE_SESSION_HEARTBEAT_TIMEOUT_MS = 5 * 60 * 1000;
-
 function migrateSchoolFacts(state: CMSDatabaseState): Set<keyof CMSDatabaseState> {
   const changedModules = new Set<keyof CMSDatabaseState>();
   const school = state.school;
@@ -419,10 +350,6 @@ class CMSDatabaseManager {
   private emitter = new EventEmitter();
   private isInitialLoadDone = false;
   private loadPromise: Promise<CMSDatabaseState> | null = null;
-
-  // In-memory Server Sessions Cache
-  private activeSessions = new Map<string, ServerSession>();
-  private revokedTokens = new Set<string>();
 
   // Rate-limiting / brute force protection
   private loginAttempts = new Map<string, RateLimitEntry>();
@@ -648,30 +575,54 @@ class CMSDatabaseManager {
       userAgent
     };
 
-    const token = signStatelessToken(sessionData);
+    const token = `iss2.${crypto.randomBytes(32).toString('base64url')}`;
     const session: ServerSession = { ...sessionData, token };
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const lockRef = doc(this.firestore, 'session_role_locks', account.role);
+    const sessionRef = doc(this.firestore, 'sessions', tokenHash);
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
       const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
-      const lastHeartbeat = Number(existingLock?.updatedAt);
-      const hasRecentHeartbeat =
-        Number.isFinite(lastHeartbeat) &&
-        lastHeartbeat > 0 &&
-        now - lastHeartbeat <= ROLE_SESSION_HEARTBEAT_TIMEOUT_MS;
-      if (existingLock && Number(existingLock.expiresAt) > now && hasRecentHeartbeat) {
-        return false;
+      let existingSessionSnapshot;
+      const existingTokenHash =
+        typeof existingLock?.tokenHash === 'string' && /^[a-f0-9]{64}$/i.test(existingLock.tokenHash)
+          ? existingLock.tokenHash
+          : undefined;
+      if (existingTokenHash) {
+        existingSessionSnapshot = await transaction.get(
+          doc(this.firestore, 'sessions', existingTokenHash)
+        );
       }
 
-      if (typeof existingLock?.tokenHash === 'string') {
-        transaction.delete(doc(this.firestore, 'sessions', existingLock.tokenHash));
+      const existingSession = existingSessionSnapshot?.exists()
+        ? existingSessionSnapshot.data()
+        : undefined;
+      const existingAccount = existingSession
+        ? this.state.adminAccounts.find((item) => item.id === existingSession.userId)
+        : undefined;
+      const hasValidExistingSession =
+        existingLock &&
+        existingSession &&
+        existingLock.tokenHash === existingTokenHash &&
+        existingLock.userId === existingSession.userId &&
+        Number(existingLock.expiresAt) > now &&
+        Number(existingSession.expiresAt) > now &&
+        existingSession.role === account.role &&
+        existingAccount?.status === 'active' &&
+        existingAccount.role === account.role;
+
+      if (hasValidExistingSession) return false;
+
+      if (existingTokenHash) {
+        transaction.delete(doc(this.firestore, 'sessions', existingTokenHash));
       }
+      transaction.set(sessionRef, sessionData);
       transaction.set(lockRef, {
         tokenHash,
         userId: account.id,
         username: account.username,
+        role: account.role,
         expiresAt,
         updatedAt: now
       });
@@ -680,77 +631,71 @@ class CMSDatabaseManager {
 
     if (!claimed) return null;
 
-    this.activeSessions.set(token, session);
-
-    // Save session asynchronously in Firestore durable session store using SHA-256 hash of token as doc id
-    const sessionDocId = crypto.createHash('sha256').update(token).digest('hex');
-    setDoc(doc(this.firestore, 'sessions', sessionDocId), {
-      token,
-      userId: account.id,
-      username: account.username,
-      fullName: account.fullName,
-      role: account.role,
-      permissions: session.permissions,
-      createdAt: now,
-      lastActivity: now,
-      expiresAt,
-      ip,
-      userAgent
-    }).catch((e) => console.warn('[Firestore Sessions] Save session warning:', e));
-
-    this.cleanExpiredSessions();
     return session;
   }
 
   public async validateSession(token: string | undefined): Promise<ServerSession | null> {
     if (!token) return null;
-    if (this.revokedTokens.has(token)) return null;
-
-    let session = this.activeSessions.get(token);
-
-    if (!session) {
-      session = verifyStatelessToken(token) || undefined;
-      if (session) {
-        this.activeSessions.set(token, session);
-      }
-    }
-
-    if (!session) return null;
 
     const now = Date.now();
-    if (now > session.expiresAt) {
-      this.activeSessions.delete(token);
-      return null;
-    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const sessionRef = doc(this.firestore, 'sessions', tokenHash);
+    const sessionData = await runTransaction(this.firestore, async (transaction) => {
+      const sessionSnapshot = await transaction.get(sessionRef);
+      if (!sessionSnapshot.exists()) return null;
+      const storedSession = sessionSnapshot.data();
+      if (
+        typeof storedSession.userId !== 'string' ||
+        typeof storedSession.username !== 'string' ||
+        !Number.isFinite(Number(storedSession.createdAt)) ||
+        !Number.isFinite(Number(storedSession.expiresAt))
+      ) return null;
+      if (storedSession.token && storedSession.token !== token) return null;
+      if (!storedSession.token && !token.startsWith('iss2.')) return null;
+      if (!['admin', 'super_admin'].includes(storedSession.role)) return null;
+
+      const lockRef = doc(this.firestore, 'session_role_locks', storedSession.role);
+      const lockSnapshot = await transaction.get(lockRef);
+      if (!lockSnapshot.exists()) return null;
+      const roleLock = lockSnapshot.data();
+      if (
+        roleLock.tokenHash !== tokenHash ||
+        roleLock.userId !== storedSession.userId ||
+        Number(roleLock.expiresAt) <= now ||
+        Number(storedSession.expiresAt) <= now
+      ) return null;
+
+      return storedSession;
+    });
+    if (!sessionData) return null;
 
     const s = this.state;
     const account = s.adminAccounts.find(
-      (a) => a.id === session!.userId || a.username.toLowerCase() === session!.username.toLowerCase()
+      (a) => a.id === sessionData.userId || a.username.toLowerCase() === sessionData.username.toLowerCase()
     );
     if (!account || account.status !== 'active') {
-      this.activeSessions.delete(token);
       await this.destroySession(token);
       return null;
     }
 
-    if (account.role !== session.role) {
-      this.activeSessions.delete(token);
+    if (account.role !== sessionData.role) {
       await this.destroySession(token);
       return null;
     }
 
-    session.role = account.role;
-    session.permissions = account.role === 'super_admin' ? ALL_PERMISSIONS.map((p) => p.key) : account.permissions;
-    session.lastActivity = now;
-
-    const lockSnapshot = await getDoc(doc(this.firestore, 'session_role_locks', session.role));
-    const roleLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    if (!roleLock || roleLock.tokenHash !== tokenHash || Number(roleLock.expiresAt) <= now) {
-      this.activeSessions.delete(token);
-      return null;
-    }
-
+    const session: ServerSession = {
+      token,
+      userId: sessionData.userId,
+      username: sessionData.username,
+      fullName: sessionData.fullName,
+      role: account.role,
+      permissions: account.role === 'super_admin' ? ALL_PERMISSIONS.map((p) => p.key) : account.permissions,
+      createdAt: Number(sessionData.createdAt),
+      lastActivity: now,
+      expiresAt: Number(sessionData.expiresAt),
+      ip: sessionData.ip || '127.0.0.1',
+      userAgent: sessionData.userAgent || 'Unknown Browser'
+    };
     return session;
   }
 
@@ -761,34 +706,53 @@ class CMSDatabaseManager {
     const now = Date.now();
     const timeoutMinutes = this.state.securityConfig?.sessionTimeoutMinutes || 60;
     const expiresAt = now + Math.max(1, timeoutMinutes) * 60 * 1000;
-    const { token: previousToken, ...sessionData } = session;
-    const refreshedSessionData = {
-      ...sessionData,
+    const refreshedSessionData: Omit<ServerSession, 'token'> = {
+      userId: session.userId,
+      username: session.username,
+      fullName: session.fullName,
+      role: session.role,
+      permissions: session.permissions,
+      createdAt: session.createdAt,
       lastActivity: now,
-      expiresAt
+      expiresAt,
+      ip: session.ip,
+      userAgent: session.userAgent
     };
     const refreshedSession: ServerSession = {
       ...refreshedSessionData,
-      token: signStatelessToken(refreshedSessionData)
+      token: `iss2.${crypto.randomBytes(32).toString('base64url')}`
     };
 
-    const previousTokenHash = crypto.createHash('sha256').update(previousToken).digest('hex');
+    const previousTokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const refreshedTokenHash = crypto.createHash('sha256').update(refreshedSession.token).digest('hex');
     const lockRef = doc(this.firestore, 'session_role_locks', session.role);
+    const previousSessionRef = doc(this.firestore, 'sessions', previousTokenHash);
+    const refreshedSessionRef = doc(this.firestore, 'sessions', refreshedTokenHash);
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
+      const sessionSnapshot = await transaction.get(previousSessionRef);
       const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
+      const existingSession = sessionSnapshot.exists() ? sessionSnapshot.data() : undefined;
       if (
         !existingLock ||
+        !existingSession ||
         existingLock.tokenHash !== previousTokenHash ||
-        Number(existingLock.expiresAt) <= now
+        existingLock.userId !== session.userId ||
+        existingSession.userId !== session.userId ||
+        existingSession.role !== session.role ||
+        (existingSession.token && existingSession.token !== token) ||
+        Number(existingLock.expiresAt) <= now ||
+        Number(existingSession.expiresAt) <= now
       ) {
         return false;
       }
 
+      transaction.delete(previousSessionRef);
+      transaction.set(refreshedSessionRef, refreshedSessionData);
       transaction.set(lockRef, {
         ...existingLock,
         tokenHash: refreshedTokenHash,
+        userId: session.userId,
         expiresAt,
         updatedAt: now
       });
@@ -796,65 +760,26 @@ class CMSDatabaseManager {
     });
     if (!claimed) return null;
 
-    const previousSessionDocId = previousTokenHash;
-    const refreshedSessionDocId = refreshedTokenHash;
-    Promise.all([
-      deleteDoc(doc(this.firestore, 'sessions', previousSessionDocId)),
-      setDoc(doc(this.firestore, 'sessions', refreshedSessionDocId), {
-        token: refreshedSession.token,
-        userId: refreshedSession.userId,
-        username: refreshedSession.username,
-        fullName: refreshedSession.fullName,
-        role: refreshedSession.role,
-        permissions: refreshedSession.permissions,
-        createdAt: refreshedSession.createdAt,
-        lastActivity: refreshedSession.lastActivity,
-        expiresAt,
-        ip: refreshedSession.ip,
-        userAgent: refreshedSession.userAgent
-      })
-    ]).catch((error) => console.warn('[Firestore Sessions] Refresh persistence warning:', error));
-
-    this.activeSessions.delete(previousToken);
-    this.revokedTokens.add(previousToken);
-    this.activeSessions.set(refreshedSession.token, refreshedSession);
     return refreshedSession;
   }
 
   public async destroySession(token: string | undefined): Promise<boolean> {
     if (!token) return false;
-    this.revokedTokens.add(token);
-    this.activeSessions.delete(token);
-    const sessionDocId = crypto.createHash('sha256').update(token).digest('hex');
-    const tokenHash = sessionDocId;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const sessionRef = doc(this.firestore, 'sessions', tokenHash);
     const roleLockRefs = ['admin', 'super_admin'].map((role) =>
       doc(this.firestore, 'session_role_locks', role)
     );
-    const deletions: Promise<unknown>[] = [
-      deleteDoc(doc(this.firestore, 'sessions', sessionDocId)),
-      ...roleLockRefs.map((lockRef) => runTransaction(this.firestore, async (transaction) => {
-        const lockSnapshot = await transaction.get(lockRef);
+    await runTransaction(this.firestore, async (transaction) => {
+      const lockSnapshots = await Promise.all(roleLockRefs.map((lockRef) => transaction.get(lockRef)));
+      transaction.delete(sessionRef);
+      lockSnapshots.forEach((lockSnapshot, index) => {
         if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
-          transaction.delete(lockRef);
+          transaction.delete(roleLockRefs[index]);
         }
-      }))
-    ];
-    await Promise.all(deletions);
+      });
+    });
     return true;
-  }
-
-  public getActiveSessions(): ServerSession[] {
-    this.cleanExpiredSessions();
-    return Array.from(this.activeSessions.values());
-  }
-
-  private cleanExpiredSessions(): void {
-    const now = Date.now();
-    for (const [token, session] of this.activeSessions.entries()) {
-      if (now > session.expiresAt) {
-        this.activeSessions.delete(token);
-      }
-    }
   }
 
   /* ---------------- BRUTE FORCE & RATE LIMITING ---------------- */
