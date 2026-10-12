@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Language, GalleryItem } from '../types';
 import {
   Image as ImageIcon,
@@ -19,14 +19,87 @@ interface GalleryViewProps {
   items?: GalleryItem[];
 }
 
-export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) => {
+export const GalleryView: React.FC<GalleryViewProps> = ({ lang }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [previewItem, setPreviewItem] = useState<GalleryItem | null>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(() => new Set());
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [hasLoadedGallery, setHasLoadedGallery] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const isNp = lang === 'np';
   const t = (en: string, np: string) => (isNp ? np : en);
 
-  const safeItems = (items || []).filter((item) =>
+  const refreshGallery = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch(getApiUrl('/api/gallery'), {
+      cache: 'no-store',
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache, no-store',
+        Pragma: 'no-cache'
+      },
+      signal
+    });
+    if (!response.ok) {
+      throw new Error(`Gallery request failed (HTTP ${response.status})`);
+    }
+    const result = await response.json() as { success?: boolean; data?: GalleryItem[]; error?: string };
+    if (!result.success || !Array.isArray(result.data)) {
+      throw new Error(result.error || 'The gallery response was invalid.');
+    }
+    setGalleryItems(result.data);
+    setHasLoadedGallery(true);
+    setFailedImages(new Set());
+    setLoadError('');
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+
+    const load = async () => {
+      if (inFlight || !active) return;
+      inFlight = true;
+      controller = new AbortController();
+      try {
+        await refreshGallery(controller.signal);
+      } catch (error) {
+        if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
+          setLoadError(error instanceof Error ? error.message : 'Could not load the public gallery.');
+        }
+      } finally {
+        inFlight = false;
+        if (active) {
+          setIsLoading(false);
+          timer = window.setTimeout(() => void load(), 15000);
+        }
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        if (timer !== undefined) window.clearTimeout(timer);
+        void load();
+      }
+    };
+
+    void load();
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      controller?.abort();
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [refreshGallery, retryCount]);
+
+  const safeItems = (hasLoadedGallery ? galleryItems : []).filter((item) =>
     item.status !== 'unpublished' &&
     item.status !== 'draft' &&
     item.published !== false &&
@@ -90,7 +163,45 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ lang, items = [] }) =>
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {loadError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <span>
+              {hasLoadedGallery
+                ? t('Could not refresh the gallery. Showing the last loaded photos.', 'ग्यालरी ताजा गर्न सकिएन। पछिल्लो लोड भएका तस्बिरहरू देखाइँदैछन्।')
+                : t('The gallery could not be loaded.', 'ग्यालरी लोड गर्न सकिएन।')}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadError('');
+                setIsLoading(!hasLoadedGallery);
+                setRetryCount((count) => count + 1);
+              }}
+              className="rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40"
+            >
+              {t('Retry', 'पुनः प्रयास')}
+            </button>
+          </div>
+        )}
+
+        {isLoading && !hasLoadedGallery ? (
+          <div role="status" aria-live="polite" className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <span className="sr-only">{t('Loading gallery photos…', 'ग्यालरीका तस्बिर लोड हुँदैछन्…')}</span>
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div className="h-48 animate-pulse bg-slate-100 dark:bg-slate-800" />
+                <div className="space-y-3 p-5">
+                  <div className="h-3 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !hasLoadedGallery && loadError ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            {t('Retry to load published gallery photos.', 'प्रकाशित तस्बिर लोड गर्न पुनः प्रयास गर्नुहोस्।')}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 py-16 text-center text-sm text-slate-500 dark:text-slate-400">
             {t('No published photos in this gallery yet.', 'यस ग्यालरीमा प्रकाशित तस्बिरहरू छैनन्।')}
           </div>
