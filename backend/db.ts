@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { EventEmitter } from 'events';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, writeBatch, Firestore } from 'firebase/firestore';
 import {
   SchoolData,
   Notice,
@@ -1218,46 +1218,73 @@ class CMSDatabaseManager {
     base64Data: string,
     size: number
   ): Promise<void> {
-    try {
-      const fileRef = doc(this.firestore, 'uploaded_files', filename);
-      await setDoc(fileRef, {
-        filename,
-        category,
-        mimeType,
-        base64Data,
-        size,
-        updatedAt: new Date().toISOString()
-      });
-    } catch (err) {
-      console.warn('[CMS Firestore] Error saving uploaded file to Firestore:', filename, err);
+    const fileRef = doc(this.firestore, 'uploaded_files', filename);
+    const existing = await getDoc(fileRef);
+    const previousChunkCount = Number(existing.data()?.chunkCount) || 0;
+    const chunkSize = 600_000;
+    const chunkCount = Math.ceil(base64Data.length / chunkSize);
+    const batch = writeBatch(this.firestore);
+
+    batch.set(fileRef, {
+      filename,
+      category,
+      mimeType,
+      ...(chunkCount > 1 ? { chunkCount } : { base64Data }),
+      size,
+      updatedAt: new Date().toISOString()
+    });
+
+    for (let index = 0; index < chunkCount; index += 1) {
+      const chunkRef = doc(this.firestore, 'uploaded_files', `${filename}__chunk__${index}`);
+      batch.set(chunkRef, { data: base64Data.slice(index * chunkSize, (index + 1) * chunkSize) });
     }
+    for (let index = chunkCount; index < previousChunkCount; index += 1) {
+      batch.delete(doc(this.firestore, 'uploaded_files', `${filename}__chunk__${index}`));
+    }
+
+    await batch.commit();
   }
 
   public async getUploadedFile(filename: string): Promise<{ base64Data: string; mimeType: string; size: number } | null> {
-    try {
-      const fileRef = doc(this.firestore, 'uploaded_files', filename);
-      const snap = await getDoc(fileRef);
-      if (snap.exists()) {
-        const d = snap.data();
-        return {
-          base64Data: d.base64Data,
-          mimeType: d.mimeType || 'application/pdf',
-          size: d.size || 0
-        };
+    const fileRef = doc(this.firestore, 'uploaded_files', filename);
+    const snap = await getDoc(fileRef);
+    if (!snap.exists()) return null;
+
+    const data = snap.data();
+    let base64Data = typeof data.base64Data === 'string' ? data.base64Data : '';
+    const chunkCount = Number(data.chunkCount) || 0;
+    if (chunkCount > 0) {
+      const chunks = await Promise.all(
+        Array.from({ length: chunkCount }, (_, index) =>
+          getDoc(doc(this.firestore, 'uploaded_files', `${filename}__chunk__${index}`))
+        )
+      );
+      if (chunks.some((chunk) => !chunk.exists() || typeof chunk.data().data !== 'string')) {
+        throw new Error(`Uploaded media ${filename} is missing one or more storage chunks`);
       }
-    } catch (err) {
-      console.warn('[CMS Firestore] Error retrieving uploaded file from Firestore:', filename, err);
+      base64Data = chunks.map((chunk) => String(chunk.data().data)).join('');
     }
-    return null;
+
+    if (!base64Data) throw new Error(`Uploaded media ${filename} has no stored content`);
+    return {
+      base64Data,
+      mimeType: data.mimeType || 'application/octet-stream',
+      size: Number(data.size) || 0
+    };
   }
 
   public async deleteUploadedFile(filename: string): Promise<void> {
-    try {
-      const fileRef = doc(this.firestore, 'uploaded_files', filename);
-      await deleteDoc(fileRef);
-    } catch (err) {
-      console.warn('[CMS Firestore] Error deleting uploaded file from Firestore:', filename, err);
+    const fileRef = doc(this.firestore, 'uploaded_files', filename);
+    const snap = await getDoc(fileRef);
+    if (!snap.exists()) return;
+
+    const chunkCount = Number(snap.data().chunkCount) || 0;
+    const batch = writeBatch(this.firestore);
+    batch.delete(fileRef);
+    for (let index = 0; index < chunkCount; index += 1) {
+      batch.delete(doc(this.firestore, 'uploaded_files', `${filename}__chunk__${index}`));
     }
+    await batch.commit();
   }
 
   public async checkDatabaseHealth(): Promise<{

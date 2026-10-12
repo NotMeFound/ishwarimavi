@@ -14,7 +14,7 @@ import crypto2 from "crypto";
 import bcrypt2 from "bcryptjs";
 import { EventEmitter } from "events";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, runTransaction, writeBatch } from "firebase/firestore";
 
 // frontend/data/schoolData.ts
 var defaultWeatherConfig = {
@@ -2804,44 +2804,66 @@ var CMSDatabaseManager = class {
   }
   /* ---------------- DURABLE OBJECT/FILE STORAGE IN FIRESTORE ---------------- */
   async saveUploadedFile(filename, category, mimeType, base64Data, size) {
-    try {
-      const fileRef = doc(this.firestore, "uploaded_files", filename);
-      await setDoc(fileRef, {
-        filename,
-        category,
-        mimeType,
-        base64Data,
-        size,
-        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-      });
-    } catch (err) {
-      console.warn("[CMS Firestore] Error saving uploaded file to Firestore:", filename, err);
+    const fileRef = doc(this.firestore, "uploaded_files", filename);
+    const existing = await getDoc(fileRef);
+    const previousChunkCount = Number(existing.data()?.chunkCount) || 0;
+    const chunkSize = 6e5;
+    const chunkCount = Math.ceil(base64Data.length / chunkSize);
+    const batch = writeBatch(this.firestore);
+    batch.set(fileRef, {
+      filename,
+      category,
+      mimeType,
+      ...chunkCount > 1 ? { chunkCount } : { base64Data },
+      size,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    for (let index = 0; index < chunkCount; index += 1) {
+      const chunkRef = doc(this.firestore, "uploaded_files", `${filename}__chunk__${index}`);
+      batch.set(chunkRef, { data: base64Data.slice(index * chunkSize, (index + 1) * chunkSize) });
     }
+    for (let index = chunkCount; index < previousChunkCount; index += 1) {
+      batch.delete(doc(this.firestore, "uploaded_files", `${filename}__chunk__${index}`));
+    }
+    await batch.commit();
   }
   async getUploadedFile(filename) {
-    try {
-      const fileRef = doc(this.firestore, "uploaded_files", filename);
-      const snap = await getDoc(fileRef);
-      if (snap.exists()) {
-        const d = snap.data();
-        return {
-          base64Data: d.base64Data,
-          mimeType: d.mimeType || "application/pdf",
-          size: d.size || 0
-        };
+    const fileRef = doc(this.firestore, "uploaded_files", filename);
+    const snap = await getDoc(fileRef);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    let base64Data = typeof data.base64Data === "string" ? data.base64Data : "";
+    const chunkCount = Number(data.chunkCount) || 0;
+    if (chunkCount > 0) {
+      const chunks = await Promise.all(
+        Array.from(
+          { length: chunkCount },
+          (_, index) => getDoc(doc(this.firestore, "uploaded_files", `${filename}__chunk__${index}`))
+        )
+      );
+      if (chunks.some((chunk) => !chunk.exists() || typeof chunk.data().data !== "string")) {
+        throw new Error(`Uploaded media ${filename} is missing one or more storage chunks`);
       }
-    } catch (err) {
-      console.warn("[CMS Firestore] Error retrieving uploaded file from Firestore:", filename, err);
+      base64Data = chunks.map((chunk) => String(chunk.data().data)).join("");
     }
-    return null;
+    if (!base64Data) throw new Error(`Uploaded media ${filename} has no stored content`);
+    return {
+      base64Data,
+      mimeType: data.mimeType || "application/octet-stream",
+      size: Number(data.size) || 0
+    };
   }
   async deleteUploadedFile(filename) {
-    try {
-      const fileRef = doc(this.firestore, "uploaded_files", filename);
-      await deleteDoc(fileRef);
-    } catch (err) {
-      console.warn("[CMS Firestore] Error deleting uploaded file from Firestore:", filename, err);
+    const fileRef = doc(this.firestore, "uploaded_files", filename);
+    const snap = await getDoc(fileRef);
+    if (!snap.exists()) return;
+    const chunkCount = Number(snap.data().chunkCount) || 0;
+    const batch = writeBatch(this.firestore);
+    batch.delete(fileRef);
+    for (let index = 0; index < chunkCount; index += 1) {
+      batch.delete(doc(this.firestore, "uploaded_files", `${filename}__chunk__${index}`));
     }
+    await batch.commit();
   }
   async checkDatabaseHealth() {
     const start = Date.now();
@@ -3883,7 +3905,7 @@ apiRouter.post("/contact/submit", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to record message in database" });
   }
 });
-apiRouter.post("/cms/upload", requireAuth, (req, res) => {
+apiRouter.post("/cms/upload", requireAuth, async (req, res) => {
   const { fileName, fileType, base64Data, category } = req.body;
   if (!base64Data || !fileName) {
     res.status(400).json({ success: false, error: "Missing file data or file name" });
@@ -3995,19 +4017,23 @@ apiRouter.post("/cms/upload", requireAuth, (req, res) => {
       return;
     }
     const mediaType = isGif ? "gif" : "image";
-    const aboutUploadDir = getBackendUploadDir("about");
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueFileName = `about-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
-    const filePath = path.join(aboutUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
+    const mimeType = isGif ? "image/gif" : isPng ? "image/png" : "image/jpeg";
+    try {
+      await db.saveUploadedFile(uniqueFileName, "about", mimeType, rawBase64, sizeInBytes);
+    } catch (error) {
+      console.error("[CMS Upload] Failed to persist About media:", error);
+      res.status(503).json({ success: false, error: "Image storage is temporarily unavailable. Please retry the upload." });
+      return;
+    }
     res.json({
       success: true,
       url: `/api/about/file/${uniqueFileName}`,
       fileName,
       uniqueFileName,
       size: sizeInBytes,
-      mediaType,
-      base64Data
+      mediaType
     });
     return;
   } else if (category === "history_bg" || category === "history") {
@@ -4038,19 +4064,23 @@ apiRouter.post("/cms/upload", requireAuth, (req, res) => {
       return;
     }
     const mediaType = isGif ? "gif" : "image";
-    const historyUploadDir = getBackendUploadDir("history");
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueFileName = `history-${Date.now()}-${crypto3.randomBytes(4).toString("hex")}-${safeBaseName}`;
-    const filePath = path.join(historyUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
+    const mimeType = isGif ? "image/gif" : isPng ? "image/png" : "image/jpeg";
+    try {
+      await db.saveUploadedFile(uniqueFileName, "history", mimeType, rawBase64, sizeInBytes);
+    } catch (error) {
+      console.error("[CMS Upload] Failed to persist History media:", error);
+      res.status(503).json({ success: false, error: "Image storage is temporarily unavailable. Please retry the upload." });
+      return;
+    }
     res.json({
       success: true,
       url: `/api/history/file/${uniqueFileName}`,
       fileName,
       uniqueFileName,
       size: sizeInBytes,
-      mediaType,
-      base64Data
+      mediaType
     });
     return;
   } else {
@@ -4165,77 +4195,107 @@ apiRouter.get("/history", async (req, res, next) => {
     data: list
   });
 });
-apiRouter.get("/about/file/:filename", (req, res) => {
+apiRouter.get("/about/file/:filename", async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  const filePath = resolveUploadFilePath("about", filename);
-  if (!filePath || !fs.existsSync(filePath)) {
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (storedFile && storedFile.mimeType.startsWith("image/")) {
+      const content = Buffer.from(storedFile.base64Data, "base64");
+      res.setHeader("Content-Type", storedFile.mimeType);
+      res.setHeader("Content-Length", content.length);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      res.end(content);
+      return;
+    }
+    const filePath = resolveUploadFilePath("about", filename);
+    if (filePath && fs.existsSync(filePath)) {
+      const ext = path.extname(filename).toLowerCase();
+      const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      res.sendFile(filePath);
+      return;
+    }
     res.status(404).json({ success: false, error: "About media resource not found" });
-    return;
+  } catch (error) {
+    console.error("[CMS Media] Failed to retrieve About media:", error);
+    res.status(503).json({ success: false, error: "Image storage is temporarily unavailable." });
   }
-  const ext = path.extname(filename).toLowerCase();
-  const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
-  res.setHeader("Content-Type", mimeType);
-  res.setHeader("Cache-Control", "public, max-age=86400, immutable");
-  res.sendFile(filePath);
 });
-apiRouter.delete("/about/file/:filename", requireAuth, (req, res) => {
+apiRouter.delete("/about/file/:filename", requireAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  const filePath = resolveUploadFilePath("about", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    try {
+  try {
+    await db.deleteUploadedFile(filename);
+    const filePath = resolveUploadFilePath("about", filename);
+    if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      res.json({ success: true, message: "Media file deleted successfully" });
-      return;
-    } catch (e) {
-      res.status(500).json({ success: false, error: "Failed to delete file" });
+    }
+    res.json({ success: true, message: "Media file deleted successfully" });
+  } catch (error) {
+    console.error("[CMS Media] Failed to delete About media:", error);
+    res.status(503).json({ success: false, error: "Image storage is temporarily unavailable." });
+  }
+});
+apiRouter.get("/history/file/:filename", async (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
+    res.status(400).json({ success: false, error: "Invalid file identifier" });
+    return;
+  }
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (storedFile && storedFile.mimeType.startsWith("image/")) {
+      const content = Buffer.from(storedFile.base64Data, "base64");
+      res.setHeader("Content-Type", storedFile.mimeType);
+      res.setHeader("Content-Length", content.length);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      res.end(content);
       return;
     }
-  }
-  res.json({ success: true, message: "File does not exist or already removed" });
-});
-apiRouter.get("/history/file/:filename", (req, res) => {
-  const filename = path.basename(req.params.filename);
-  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
-    res.status(400).json({ success: false, error: "Invalid file identifier" });
-    return;
-  }
-  const filePath = resolveUploadFilePath("history", filename);
-  if (!filePath || !fs.existsSync(filePath)) {
+    const filePath = resolveUploadFilePath("history", filename);
+    if (filePath && fs.existsSync(filePath)) {
+      const ext = path.extname(filename).toLowerCase();
+      const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      res.sendFile(filePath);
+      return;
+    }
     res.status(404).json({ success: false, error: "History media resource not found" });
-    return;
+  } catch (error) {
+    console.error("[CMS Media] Failed to retrieve History media:", error);
+    res.status(503).json({ success: false, error: "Image storage is temporarily unavailable." });
   }
-  const ext = path.extname(filename).toLowerCase();
-  const mimeType = ext === ".gif" ? "image/gif" : ext === ".png" ? "image/png" : "image/jpeg";
-  res.setHeader("Content-Type", mimeType);
-  res.setHeader("Cache-Control", "public, max-age=86400, immutable");
-  res.sendFile(filePath);
 });
-apiRouter.delete("/history/file/:filename", requireAuth, (req, res) => {
+apiRouter.delete("/history/file/:filename", requireAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: "Invalid file identifier" });
     return;
   }
-  const filePath = resolveUploadFilePath("history", filename);
-  if (filePath && fs.existsSync(filePath)) {
-    try {
+  try {
+    await db.deleteUploadedFile(filename);
+    const filePath = resolveUploadFilePath("history", filename);
+    if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      res.json({ success: true, message: "History media file deleted successfully" });
-      return;
-    } catch (e) {
-      res.status(500).json({ success: false, error: "Failed to delete file" });
-      return;
     }
+    res.json({ success: true, message: "History media file deleted successfully" });
+  } catch (error) {
+    console.error("[CMS Media] Failed to delete History media:", error);
+    res.status(503).json({ success: false, error: "Image storage is temporarily unavailable." });
   }
-  res.json({ success: true, message: "File does not exist or already removed" });
 });
 apiRouter.get("/vacancy/file/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);

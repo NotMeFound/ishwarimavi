@@ -1156,7 +1156,7 @@ apiRouter.post('/contact/submit', async (req: Request, res: Response) => {
 });
 
 // 11. Secure File Upload Validator (Images & PDF documents)
-apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
+apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) => {
   const { fileName, fileType, base64Data, category } = req.body;
 
   if (!base64Data || !fileName) {
@@ -1294,12 +1294,16 @@ apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
 
     const mediaType: 'gif' | 'image' = isGif ? 'gif' : 'image';
 
-    // Persist file in dedicated backend uploads folder backend/uploads/about
-    const aboutUploadDir = getBackendUploadDir('about');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `about-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
-    const filePath = path.join(aboutUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
+    const mimeType = isGif ? 'image/gif' : isPng ? 'image/png' : 'image/jpeg';
+    try {
+      await db.saveUploadedFile(uniqueFileName, 'about', mimeType, rawBase64, sizeInBytes);
+    } catch (error) {
+      console.error('[CMS Upload] Failed to persist About media:', error);
+      res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable. Please retry the upload.' });
+      return;
+    }
 
     res.json({
       success: true,
@@ -1307,8 +1311,7 @@ apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
       fileName,
       uniqueFileName,
       size: sizeInBytes,
-      mediaType,
-      base64Data: base64Data
+      mediaType
     });
     return;
   } else if (category === 'history_bg' || category === 'history') {
@@ -1343,12 +1346,16 @@ apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
 
     const mediaType: 'gif' | 'image' = isGif ? 'gif' : 'image';
 
-    // Persist file in dedicated backend uploads folder backend/uploads/history
-    const historyUploadDir = getBackendUploadDir('history');
     const safeBaseName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniqueFileName = `history-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeBaseName}`;
-    const filePath = path.join(historyUploadDir, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
+    const mimeType = isGif ? 'image/gif' : isPng ? 'image/png' : 'image/jpeg';
+    try {
+      await db.saveUploadedFile(uniqueFileName, 'history', mimeType, rawBase64, sizeInBytes);
+    } catch (error) {
+      console.error('[CMS Upload] Failed to persist History media:', error);
+      res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable. Please retry the upload.' });
+      return;
+    }
 
     res.json({
       success: true,
@@ -1356,8 +1363,7 @@ apiRouter.post('/cms/upload', requireAuth, (req: Request, res: Response) => {
       fileName,
       uniqueFileName,
       size: sizeInBytes,
-      mediaType,
-      base64Data: base64Data
+      mediaType
     });
     return;
   } else {
@@ -1517,81 +1523,113 @@ apiRouter.get('/history', async (req: Request, res: Response, next: NextFunction
 });
 
 // 15. Serve About Page Media (Images & GIFs) with Security Headers and Path Traversal Protection
-apiRouter.get('/about/file/:filename', (req: Request, res: Response) => {
+apiRouter.get('/about/file/:filename', async (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
     return;
   }
-  const filePath = resolveUploadFilePath('about', filename);
-  if (!filePath || !fs.existsSync(filePath)) {
-    res.status(404).json({ success: false, error: 'About media resource not found' });
-    return;
-  }
-  const ext = path.extname(filename).toLowerCase();
-  const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
-  res.setHeader('Content-Type', mimeType);
-  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-  res.sendFile(filePath);
-});
-
-apiRouter.delete('/about/file/:filename', requireAuth, (req: Request, res: Response) => {
-  const filename = path.basename(req.params.filename);
-  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
-    res.status(400).json({ success: false, error: 'Invalid file identifier' });
-    return;
-  }
-  const filePath = resolveUploadFilePath('about', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    try {
-      fs.unlinkSync(filePath);
-      res.json({ success: true, message: 'Media file deleted successfully' });
-      return;
-    } catch (e: any) {
-      res.status(500).json({ success: false, error: 'Failed to delete file' });
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (storedFile && storedFile.mimeType.startsWith('image/')) {
+      const content = Buffer.from(storedFile.base64Data, 'base64');
+      res.setHeader('Content-Type', storedFile.mimeType);
+      res.setHeader('Content-Length', content.length);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.end(content);
       return;
     }
+
+    const filePath = resolveUploadFilePath('about', filename);
+    if (filePath && fs.existsSync(filePath)) {
+      const ext = path.extname(filename).toLowerCase();
+      const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.sendFile(filePath);
+      return;
+    }
+    res.status(404).json({ success: false, error: 'About media resource not found' });
+  } catch (error) {
+    console.error('[CMS Media] Failed to retrieve About media:', error);
+    res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable.' });
   }
-  res.json({ success: true, message: 'File does not exist or already removed' });
+});
+
+apiRouter.delete('/about/file/:filename', requireAuth, async (req: Request, res: Response) => {
+  const filename = path.basename(req.params.filename);
+  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
+    res.status(400).json({ success: false, error: 'Invalid file identifier' });
+    return;
+  }
+  try {
+    await db.deleteUploadedFile(filename);
+    const filePath = resolveUploadFilePath('about', filename);
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    res.json({ success: true, message: 'Media file deleted successfully' });
+  } catch (error) {
+    console.error('[CMS Media] Failed to delete About media:', error);
+    res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable.' });
+  }
 });
 
 // 16. Serve School History Page Media (Images & GIFs) with Security Headers and Path Traversal Protection
-apiRouter.get('/history/file/:filename', (req: Request, res: Response) => {
+apiRouter.get('/history/file/:filename', async (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
   if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
     res.status(400).json({ success: false, error: 'Invalid file identifier' });
     return;
   }
-  const filePath = resolveUploadFilePath('history', filename);
-  if (!filePath || !fs.existsSync(filePath)) {
-    res.status(404).json({ success: false, error: 'History media resource not found' });
-    return;
-  }
-  const ext = path.extname(filename).toLowerCase();
-  const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
-  res.setHeader('Content-Type', mimeType);
-  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-  res.sendFile(filePath);
-});
-
-apiRouter.delete('/history/file/:filename', requireAuth, (req: Request, res: Response) => {
-  const filename = path.basename(req.params.filename);
-  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
-    res.status(400).json({ success: false, error: 'Invalid file identifier' });
-    return;
-  }
-  const filePath = resolveUploadFilePath('history', filename);
-  if (filePath && fs.existsSync(filePath)) {
-    try {
-      fs.unlinkSync(filePath);
-      res.json({ success: true, message: 'History media file deleted successfully' });
-      return;
-    } catch (e: any) {
-      res.status(500).json({ success: false, error: 'Failed to delete file' });
+  try {
+    const storedFile = await db.getUploadedFile(filename);
+    if (storedFile && storedFile.mimeType.startsWith('image/')) {
+      const content = Buffer.from(storedFile.base64Data, 'base64');
+      res.setHeader('Content-Type', storedFile.mimeType);
+      res.setHeader('Content-Length', content.length);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.end(content);
       return;
     }
+
+    const filePath = resolveUploadFilePath('history', filename);
+    if (filePath && fs.existsSync(filePath)) {
+      const ext = path.extname(filename).toLowerCase();
+      const mimeType = ext === '.gif' ? 'image/gif' : ext === '.png' ? 'image/png' : 'image/jpeg';
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.sendFile(filePath);
+      return;
+    }
+    res.status(404).json({ success: false, error: 'History media resource not found' });
+  } catch (error) {
+    console.error('[CMS Media] Failed to retrieve History media:', error);
+    res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable.' });
   }
-  res.json({ success: true, message: 'File does not exist or already removed' });
+});
+
+apiRouter.delete('/history/file/:filename', requireAuth, async (req: Request, res: Response) => {
+  const filename = path.basename(req.params.filename);
+  if (!filename.match(/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|gif)$/i)) {
+    res.status(400).json({ success: false, error: 'Invalid file identifier' });
+    return;
+  }
+  try {
+    await db.deleteUploadedFile(filename);
+    const filePath = resolveUploadFilePath('history', filename);
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    res.json({ success: true, message: 'History media file deleted successfully' });
+  } catch (error) {
+    console.error('[CMS Media] Failed to delete History media:', error);
+    res.status(503).json({ success: false, error: 'Image storage is temporarily unavailable.' });
+  }
 });
 
 // 17. Serve Vacancy / Career PDF Documents with Security Headers and Path Traversal Protection

@@ -88,6 +88,9 @@ ishwari-secondary-school/
   Admin sessions use cryptographically random opaque tokens whose hashes and
   role locks are stored atomically in Firestore, so session validity is shared
   across backend instances and does not depend on a per-process signing key.
+  Uploaded About and History images are stored durably in Firestore rather than
+  the server's temporary filesystem, so background-media URLs keep working
+  across serverless instances and deployments.
 
 ### Vercel (Frontend React SPA)
 - **Framework**: Vite
