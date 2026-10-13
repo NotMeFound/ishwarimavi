@@ -73,8 +73,4 @@ CREATE TABLE IF NOT EXISTS `admin_users` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Initial password is 'admin123'
-INSERT INTO `admin_users` (`id`, `username`, `password_hash`, `full_name`) VALUES
-(1, 'admin@ishwari.edu.np', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator');
-
 COMMIT;

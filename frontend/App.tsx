@@ -169,7 +169,7 @@ export default function App() {
   const [facilities, setFacilities] = useState<Facility[]>(initialFacilities);
   const [programs, setPrograms] = useState<AcademicProgram[]>(initialPrograms);
   const [documents, setDocuments] = useState<DocumentItem[]>(initialDocuments);
-  const [messages, setMessages] = useState<ContactMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [events, setEvents] = useState<SchoolEvent[]>(initialEvents);
   const [achievements, setAchievements] = useState<Achievement[]>(initialAchievements);
   const [history, setHistory] = useState<HistoryItem[]>(initialHistory);
@@ -181,7 +181,7 @@ export default function App() {
     primaryColorName: 'Academic Navy',
   }));
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(initialSecurityConfig);
-  const [auditLogs, setAuditLogs] = useState<SecurityAuditLogEntry[]>(initialAuditLogs);
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditLogEntry[]>([]);
   const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>(() => loadAdminAccounts());
   const [faqs, setFaqs] = useState<SchoolFAQItem[]>(initialFAQs);
 
@@ -471,14 +471,14 @@ export default function App() {
     setPrograms(initialPrograms);
     setDocuments(initialDocuments);
     setFaqs(initialFAQs);
-    setMessages(initialMessages);
+    setMessages([]);
     setEvents(initialEvents);
     setAchievements(initialAchievements);
     setHistory(initialHistory);
     setGallery(initialGallery);
     setSiteConfig(initialSiteConfig);
     setSecurityConfig(initialSecurityConfig);
-    setAuditLogs(initialAuditLogs);
+    setAuditLogs([]);
 
     // Resets authoritative database to factory defaults
     await apiClient.resetToDefaults('Super Admin');

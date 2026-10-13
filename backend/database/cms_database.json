@@ -1147,10 +1147,6 @@
     }
   },
   "securityConfig": {
-    "adminUsername": "admin",
-    "adminPassword": "Ishwari@Secure2026",
-    "adminPasswordHash": "Ishwari@Secure2026",
-    "recoveryPin": "782035",
     "lockoutThreshold": 5,
     "lockoutDurationMinutes": 5,
     "sessionTimeoutMinutes": 30,
@@ -2390,72 +2386,6 @@
       "details": "Updated adminAccounts content in authoritative database"
     }
   ],
-  "adminAccounts": [
-    {
-      "id": "usr_superadmin",
-      "username": "ishwari-superadmin",
-      "fullName": "Master System Administrator (विद्यालय प्रमुख / प्रणाली प्रशासक)",
-      "email": "superadmin@ishwari.edu.np",
-      "role": "super_admin",
-      "passwordHash": "$2b$10$US8/qhy4fZH.GJu5US/g9eEhvTVvB6eQNlnbyK/9t8Ue8jyiZoJ56",
-      "salt": "salt_ishwari_super",
-      "status": "active",
-      "permissions": [
-        "notice.view",
-        "notice.create",
-        "notice.update",
-        "notice.delete",
-        "teacher.view",
-        "teacher.create",
-        "teacher.update",
-        "teacher.delete",
-        "staff.view",
-        "staff.create",
-        "staff.update",
-        "staff.delete",
-        "gallery.view",
-        "gallery.create",
-        "gallery.update",
-        "gallery.delete",
-        "settings.view",
-        "settings.update",
-        "admin.view",
-        "admin.create",
-        "admin.update",
-        "admin.delete"
-      ],
-      "createdAt": "2083-01-01",
-      "lastLogin": "2026-10-08 03:12 PM"
-    },
-    {
-      "id": "usr_admin",
-      "username": "ishwari",
-      "fullName": "School Operations Officer (प्रशासन अधिकृत)",
-      "email": "admin@ishwari.edu.np",
-      "role": "admin",
-      "passwordHash": "$2b$10$US8/qhy4fZH.GJu5US/g9eEhvTVvB6eQNlnbyK/9t8Ue8jyiZoJ56",
-      "salt": "salt_ishwari_admin",
-      "status": "active",
-      "permissions": [
-        "notice.view",
-        "notice.create",
-        "notice.update",
-        "notice.delete",
-        "teacher.view",
-        "teacher.create",
-        "teacher.update",
-        "staff.view",
-        "staff.create",
-        "staff.update",
-        "gallery.view",
-        "gallery.create",
-        "gallery.update",
-        "gallery.delete",
-        "settings.view"
-      ],
-      "createdAt": "2083-02-10",
-      "lastLogin": "2026-10-04 02:59 PM"
-    }
-  ],
+  "adminAccounts": [],
   "faqs": []
 }

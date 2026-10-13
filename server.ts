@@ -1,10 +1,8 @@
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import express from 'express';
-import dotenv from 'dotenv';
 import { createApp } from './backend/app';
-
-dotenv.config();
 
 declare const IS_PRODUCTION_BUILD: boolean | undefined;
 

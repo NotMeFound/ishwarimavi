@@ -4,8 +4,14 @@ import os from 'os';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { EventEmitter } from 'events';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, runTransaction, writeBatch, Firestore } from 'firebase/firestore';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
+import {
+  getFirestore,
+  Firestore,
+  DocumentReference,
+  DocumentData,
+  Transaction
+} from 'firebase-admin/firestore';
 import {
   SchoolData,
   Notice,
@@ -38,16 +44,14 @@ import {
   initialHistory,
   initialDocuments,
   initialPrograms,
-  initialMessages,
   initialGallery,
   initialSiteConfig,
   initialSecurityConfig,
-  initialAuditLogs,
   initialCurriculumGuidelines,
   initialVacancies,
   initialFAQs
 } from '../frontend/data/schoolData';
-import { initialAdminAccounts, ALL_PERMISSIONS } from '../frontend/utils/security';
+import { ALL_PERMISSIONS } from '../frontend/utils/security';
 
 export const defaultAboutSections: AboutSection[] = [
   {
@@ -177,32 +181,152 @@ export function hashPasswordBcrypt(password: string): string {
 
 export function verifyPasswordBcrypt(password: string, hash: string): boolean {
   if (!password || !hash) return false;
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
-    try {
-      return bcrypt.compareSync(password, hash);
-    } catch {
-      return false;
-    }
+  if (!/^\$2[aby]\$\d\d\$/.test(hash)) return false;
+  try {
+    return bcrypt.compareSync(password, hash);
+  } catch {
+    return false;
   }
-  return password === hash;
 }
 
-export const FIREBASE_CONFIG = {
-  projectId: 'imposing-practice-w6tvw',
-  appId: '1:801110298190:web:8caf18bf341076c7a8bd1f',
-  apiKey: 'AIzaSyA6bwICa7vuwur1g0MoYxdTtH2Kl1QOImI',
-  authDomain: 'imposing-practice-w6tvw.firebaseapp.com',
-  firestoreDatabaseId: 'ai-studio-ishwarisecondary-62e4059d-8fd8-48dc-9660-818a91224b4e',
-  storageBucket: 'imposing-practice-w6tvw.firebasestorage.app',
-  messagingSenderId: '801110298190',
-  measurementId: '',
-  oAuthClientId: '801110298190-k04n444nd7c7n5hi6igjbei3e4iuni1h.apps.googleusercontent.com',
-  recaptchaSiteKey: ''
-};
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'imposing-practice-w6tvw';
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID ||
+  'ai-studio-ishwarisecondary-62e4059d-8fd8-48dc-9660-818a91224b4e';
 
 export function getFirestoreDb(): Firestore {
-  const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApps()[0];
-  return getFirestore(app, FIREBASE_CONFIG.firestoreDatabaseId);
+  const existingApp = getApps().find((app) => app.name === 'ishwari-cms');
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  let credential;
+  if (serviceAccountJson) {
+    let serviceAccount: Record<string, unknown>;
+    try {
+      serviceAccount = JSON.parse(serviceAccountJson);
+    } catch {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must contain valid service-account JSON.');
+    }
+    credential = cert(serviceAccount);
+  } else {
+    credential = applicationDefault();
+  }
+  const app = existingApp || initializeApp({
+    credential,
+    projectId: FIREBASE_PROJECT_ID
+  }, 'ishwari-cms');
+  return getFirestore(app, FIRESTORE_DATABASE_ID);
+}
+
+function doc(firestore: Firestore, ...segments: string[]): DocumentReference {
+  return firestore.doc(segments.join('/'));
+}
+
+function getDoc(reference: DocumentReference) {
+  return reference.get();
+}
+
+function setDoc(reference: DocumentReference, data: DocumentData) {
+  return reference.set(data);
+}
+
+function deleteDoc(reference: DocumentReference) {
+  return reference.delete();
+}
+
+function runTransaction<T>(
+  firestore: Firestore,
+  callback: (transaction: Transaction) => Promise<T>
+): Promise<T> {
+  return firestore.runTransaction(callback);
+}
+
+function writeBatch(firestore: Firestore) {
+  return firestore.batch();
+}
+
+const EXPOSED_SEED_PASSWORD_HASH = '$2b$10$US8/qhy4fZH.GJu5US/g9eEhvTVvB6eQNlnbyK/9t8Ue8jyiZoJ56';
+
+function createBootstrapAdminAccounts(): AdminAccount[] {
+  const username = process.env.SUPER_ADMIN_BOOTSTRAP_USERNAME?.trim();
+  const password = process.env.SUPER_ADMIN_BOOTSTRAP_PASSWORD;
+  if (!username && !password) return [];
+  if (!username || !password || password.length < 14) {
+    throw new Error('Set SUPER_ADMIN_BOOTSTRAP_USERNAME and a password of at least 14 characters before first database initialization.');
+  }
+
+  return [{
+    id: 'usr_superadmin',
+    username,
+    fullName: 'Super Administrator',
+    email: process.env.SUPER_ADMIN_BOOTSTRAP_EMAIL?.trim() || 'superadmin@school.invalid',
+    role: 'super_admin',
+    passwordHash: hashPasswordBcrypt(password),
+    salt: '',
+    status: 'active',
+    permissions: ALL_PERMISSIONS.map((permission) => permission.key),
+    createdAt: new Date().toISOString(),
+    lastLogin: ''
+  }];
+}
+
+function sanitizeSecurityConfig(value: unknown): SecurityConfig {
+  const source = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {};
+  const initial = initialSecurityConfig;
+  const routeSlug = typeof source.adminRouteSlug === 'string'
+    ? source.adminRouteSlug.toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(0, 80)
+    : initial.adminRouteSlug;
+
+  return {
+    lockoutThreshold: [3, 5, 10].includes(Number(source.lockoutThreshold))
+      ? Number(source.lockoutThreshold)
+      : initial.lockoutThreshold,
+    lockoutDurationMinutes: [3, 5, 15, 30].includes(Number(source.lockoutDurationMinutes))
+      ? Number(source.lockoutDurationMinutes)
+      : initial.lockoutDurationMinutes,
+    sessionTimeoutMinutes: Number.isInteger(Number(source.sessionTimeoutMinutes)) &&
+      Number(source.sessionTimeoutMinutes) >= 5 &&
+      Number(source.sessionTimeoutMinutes) <= 1440
+      ? Number(source.sessionTimeoutMinutes)
+      : initial.sessionTimeoutMinutes,
+    adminRouteSlug: routeSlug || initial.adminRouteSlug,
+    hideAdminLinkInHeader: source.hideAdminLinkInHeader === true
+  };
+}
+
+export function verifyRecoverySecret(input: string, configuredSecret: string | undefined): boolean {
+  if (!input || !configuredSecret || configuredSecret.length < 32) return false;
+  const inputDigest = crypto.createHash('sha256').update(input).digest();
+  const configuredDigest = crypto.createHash('sha256').update(configuredSecret).digest();
+  return crypto.timingSafeEqual(inputDigest, configuredDigest);
+}
+
+function normalizeAdminAccounts(accounts: AdminAccount[]): AdminAccount[] {
+  return accounts.map((account) => {
+    if (typeof account.passwordHash !== 'string' || !account.passwordHash.trim()) {
+      throw new Error(`Administrator account "${account.username}" must have a password.`);
+    }
+    const isBcrypt = /^\$2[aby]\$\d\d\$/.test(account.passwordHash);
+    return {
+      ...account,
+      passwordHash: isBcrypt ? account.passwordHash : hashPasswordBcrypt(account.passwordHash),
+      salt: ''
+    };
+  });
+}
+
+function preserveExistingAdminPasswords(
+  accounts: AdminAccount[],
+  existingAccounts: AdminAccount[]
+): AdminAccount[] {
+  const existingById = new Map(existingAccounts.map((account) => [account.id, account]));
+  const restored = accounts.map((account) => {
+    if (account.passwordHash !== '' && account.passwordHash !== '[PROTECTED_BCRYPT_HASH]') {
+      return account;
+    }
+    const existing = existingById.get(account.id);
+    return existing ? { ...account, passwordHash: existing.passwordHash } : account;
+  });
+  return normalizeAdminAccounts(restored);
 }
 
 const CMS_MODULE_KEYS = [
@@ -363,14 +487,6 @@ class CMSDatabaseManager {
   }
 
   private getDefaultState(): CMSDatabaseState {
-    const secureAdminAccounts: AdminAccount[] = initialAdminAccounts.map((acc) => {
-      const isBcrypt = acc.passwordHash?.startsWith('$2b$') || acc.passwordHash?.startsWith('$2a$');
-      return {
-        ...acc,
-        passwordHash: isBcrypt ? acc.passwordHash : hashPasswordBcrypt(acc.passwordHash)
-      };
-    });
-
     return {
       version: 1,
       lastModified: new Date().toISOString(),
@@ -383,16 +499,16 @@ class CMSDatabaseManager {
       documents: [...initialDocuments],
       curriculumGuidelines: [...initialCurriculumGuidelines],
       vacancies: [...initialVacancies],
-      messages: [...initialMessages],
+      messages: [],
       events: [...initialEvents],
       achievements: [...initialAchievements],
       history: [...initialHistory],
       gallery: [...initialGallery],
       faqs: [...initialFAQs],
       siteConfig: { ...initialSiteConfig },
-      securityConfig: { ...initialSecurityConfig },
-      auditLogs: [...initialAuditLogs],
-      adminAccounts: secureAdminAccounts
+      securityConfig: sanitizeSecurityConfig(initialSecurityConfig),
+      auditLogs: [],
+      adminAccounts: createBootstrapAdminAccounts()
     };
   }
 
@@ -411,9 +527,12 @@ class CMSDatabaseManager {
         const metaRef = doc(this.firestore, 'cms_modules', '_metadata');
         const metaSnap = await getDoc(metaRef);
 
-        if (!metaSnap.exists()) {
+        if (!metaSnap.exists) {
           // Cold initial seed to Firestore if collection does not exist
           const defaultState = this.getDefaultState();
+          if (!defaultState.adminAccounts.some((account) => account.role === 'super_admin')) {
+            throw new Error('First database initialization requires secure Super Admin bootstrap credentials.');
+          }
           for (const key of CMS_MODULE_KEYS) {
             await setDoc(doc(this.firestore, 'cms_modules', key), {
               moduleId: key,
@@ -456,7 +575,7 @@ class CMSDatabaseManager {
 
         moduleSnaps.forEach((snap, idx) => {
           const key = CMS_MODULE_KEYS[idx];
-          if (snap.exists()) {
+          if (snap.exists) {
             const docData = snap.data();
             (loadedState as any)[key] = docData.data !== undefined ? docData.data : (defaultFallback as any)[key];
           } else {
@@ -489,6 +608,80 @@ class CMSDatabaseManager {
           });
         }
 
+        let securityMigrationRequired = false;
+        const rawSecurityConfig = loadedState.securityConfig as unknown as Record<string, unknown> | undefined;
+        if (rawSecurityConfig) {
+          securityMigrationRequired = [
+            'adminUsername',
+            'adminPassword',
+            'adminPasswordHash',
+            'recoveryPin',
+            'emergencyPin'
+          ].some((key) => key in rawSecurityConfig);
+        }
+        loadedState.securityConfig = sanitizeSecurityConfig(loadedState.securityConfig);
+
+        const accounts = Array.isArray(loadedState.adminAccounts) ? loadedState.adminAccounts : [];
+        const exposedAccounts = accounts.filter((account) => account.passwordHash === EXPOSED_SEED_PASSWORD_HASH);
+        const bootstrapAccount = this.getDefaultState().adminAccounts.find((account) => account.role === 'super_admin');
+        if (exposedAccounts.some((account) => account.role === 'super_admin') && !bootstrapAccount) {
+          throw new Error('The database contains a published default Super Admin credential. Configure a new bootstrap username and password before continuing.');
+        }
+        if (exposedAccounts.length) {
+          let migratedSuperAdmin = false;
+          loadedState.adminAccounts = accounts.map((account) => {
+            if (account.passwordHash !== EXPOSED_SEED_PASSWORD_HASH) return account;
+            if (account.role === 'super_admin' && bootstrapAccount && !migratedSuperAdmin) {
+              migratedSuperAdmin = true;
+              return {
+                ...account,
+                username: bootstrapAccount.username,
+                email: bootstrapAccount.email,
+                passwordHash: bootstrapAccount.passwordHash,
+                salt: '',
+                status: 'active'
+              };
+            }
+            return {
+              ...account,
+              passwordHash: hashPasswordBcrypt(crypto.randomBytes(48).toString('base64url')),
+              salt: '',
+              status: 'inactive'
+            };
+          });
+        }
+        if (!(loadedState.adminAccounts || []).some((account) => account.role === 'super_admin' && account.status === 'active')) {
+          throw new Error('No active Super Admin account is provisioned in the database.');
+        }
+
+        if (securityMigrationRequired || exposedAccounts.length) {
+          const migratedVersion = Number(loadedState.version || remoteVersion) + 1;
+          const migrationTimestamp = new Date().toISOString();
+          const batch = this.firestore.batch();
+          if (securityMigrationRequired) {
+            batch.set(doc(this.firestore, 'cms_modules', 'securityConfig'), {
+              moduleId: 'securityConfig',
+              data: loadedState.securityConfig,
+              updatedAt: migrationTimestamp
+            });
+          }
+          if (exposedAccounts.length) {
+            batch.set(doc(this.firestore, 'cms_modules', 'adminAccounts'), {
+              moduleId: 'adminAccounts',
+              data: loadedState.adminAccounts,
+              updatedAt: migrationTimestamp
+            });
+          }
+          batch.set(metaRef, {
+            ...remoteMeta,
+            version: migratedVersion,
+            lastModified: migrationTimestamp
+          });
+          await batch.commit();
+          loadedState.version = migratedVersion;
+          loadedState.lastModified = migrationTimestamp;
+        }
+
         this.state = loadedState as CMSDatabaseState;
         this.isInitialLoadDone = true;
         return this.state;
@@ -518,27 +711,55 @@ class CMSDatabaseManager {
     return { version: this.state.version, lastModified: this.state.lastModified };
   }
 
-  public getPublicState(): Omit<CMSDatabaseState, 'adminAccounts' | 'securityConfig'> & {
-    securityConfig: Partial<SecurityConfig>;
+  public getPublicState(): Pick<CMSDatabaseState,
+    'version' | 'lastModified' | 'school' | 'aboutSections' | 'notices' | 'staff' |
+    'facilities' | 'programs' | 'documents' | 'curriculumGuidelines' | 'vacancies' |
+    'events' | 'achievements' | 'history' | 'gallery' | 'faqs' | 'siteConfig'
+  > & {
+    securityConfig: Pick<SecurityConfig, 'adminRouteSlug' | 'hideAdminLinkInHeader'>;
   } {
     const s = this.getState();
-    const { recoveryPin, ...publicSecConfig } = s.securityConfig;
     return {
       version: s.version,
       lastModified: s.lastModified,
       school: s.school,
-      aboutSections: s.aboutSections || defaultAboutSections,
-      notices: (s.notices || initialNotices).filter((item: any) => item.published !== false && item.is_published !== false),
-      staff: s.staff,
-      facilities: s.facilities,
-      programs: s.programs,
-      documents: s.documents,
+      aboutSections: (s.aboutSections || defaultAboutSections).filter((item) =>
+        item.status === 'published' && item.is_enabled !== false
+      ),
+      notices: (s.notices || initialNotices).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      staff: (s.staff || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      facilities: (s.facilities || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      programs: (s.programs || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      documents: (s.documents || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
       curriculumGuidelines: (s.curriculumGuidelines || []).filter((item) => item.status === 'published'),
       vacancies: (s.vacancies || initialVacancies).filter((item: any) => item.status === 'published' && item.is_open !== false),
-      messages: s.messages,
-      events: s.events,
-      achievements: s.achievements,
-      history: (s.history || []).filter((item: any) => item.status !== 'unpublished' && item.is_enabled !== false),
+      events: (s.events || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      achievements: (s.achievements || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
+      history: (s.history || []).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished' &&
+        item.published !== false && item.is_published !== false && item.is_enabled !== false
+      ),
       gallery: (s.gallery || []).filter((item: any) =>
         item.status !== 'unpublished' &&
         item.status !== 'draft' &&
@@ -549,10 +770,14 @@ class CMSDatabaseManager {
         ...item,
         image: item.image || item.url || ''
       })),
-      faqs: (s.faqs || initialFAQs).filter((item: any) => item.status !== 'draft'),
+      faqs: (s.faqs || initialFAQs).filter((item: any) =>
+        item.status !== 'draft' && item.status !== 'unpublished'
+      ),
       siteConfig: s.siteConfig,
-      securityConfig: publicSecConfig,
-      auditLogs: s.auditLogs
+      securityConfig: {
+        adminRouteSlug: s.securityConfig.adminRouteSlug,
+        hideAdminLinkInHeader: s.securityConfig.hideAdminLinkInHeader
+      }
     };
   }
 
@@ -592,7 +817,7 @@ class CMSDatabaseManager {
     const sessionRef = doc(this.firestore, 'sessions', tokenHash);
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
-      const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
+      const existingLock = lockSnapshot.exists ? lockSnapshot.data() : undefined;
       let existingSessionSnapshot;
       const existingTokenHash =
         typeof existingLock?.tokenHash === 'string' && /^[a-f0-9]{64}$/i.test(existingLock.tokenHash)
@@ -604,7 +829,7 @@ class CMSDatabaseManager {
         );
       }
 
-      const existingSession = existingSessionSnapshot?.exists()
+      const existingSession = existingSessionSnapshot?.exists
         ? existingSessionSnapshot.data()
         : undefined;
       const existingAccount = existingSession
@@ -651,7 +876,7 @@ class CMSDatabaseManager {
     const sessionRef = doc(this.firestore, 'sessions', tokenHash);
     const sessionData = await runTransaction(this.firestore, async (transaction) => {
       const sessionSnapshot = await transaction.get(sessionRef);
-      if (!sessionSnapshot.exists()) return null;
+      if (!sessionSnapshot.exists) return null;
       const storedSession = sessionSnapshot.data();
       if (
         typeof storedSession.userId !== 'string' ||
@@ -665,7 +890,7 @@ class CMSDatabaseManager {
 
       const lockRef = doc(this.firestore, 'session_role_locks', storedSession.role);
       const lockSnapshot = await transaction.get(lockRef);
-      if (!lockSnapshot.exists()) return null;
+      if (!lockSnapshot.exists) return null;
       const roleLock = lockSnapshot.data();
       if (
         roleLock.tokenHash !== tokenHash ||
@@ -740,8 +965,8 @@ class CMSDatabaseManager {
     const claimed = await runTransaction(this.firestore, async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
       const sessionSnapshot = await transaction.get(previousSessionRef);
-      const existingLock = lockSnapshot.exists() ? lockSnapshot.data() : undefined;
-      const existingSession = sessionSnapshot.exists() ? sessionSnapshot.data() : undefined;
+      const existingLock = lockSnapshot.exists ? lockSnapshot.data() : undefined;
+      const existingSession = sessionSnapshot.exists ? sessionSnapshot.data() : undefined;
       if (
         !existingLock ||
         !existingSession ||
@@ -783,7 +1008,7 @@ class CMSDatabaseManager {
       const lockSnapshots = await Promise.all(roleLockRefs.map((lockRef) => transaction.get(lockRef)));
       transaction.delete(sessionRef);
       lockSnapshots.forEach((lockSnapshot, index) => {
-        if (lockSnapshot.exists() && lockSnapshot.data().tokenHash === tokenHash) {
+        if (lockSnapshot.exists && lockSnapshot.data().tokenHash === tokenHash) {
           transaction.delete(roleLockRefs[index]);
         }
       });
@@ -1019,15 +1244,11 @@ class CMSDatabaseManager {
       }));
     }
 
-    // If updating adminAccounts, ensure all accounts have bcrypt-hashed passwords
     if (moduleKey === 'adminAccounts' && Array.isArray(data)) {
-      data = data.map((acc: AdminAccount) => {
-        const isBcrypt = acc.passwordHash?.startsWith('$2b$') || acc.passwordHash?.startsWith('$2a$');
-        return {
-          ...acc,
-          passwordHash: isBcrypt ? acc.passwordHash : hashPasswordBcrypt(acc.passwordHash || 'Ishwari@Secure2026')
-        };
-      });
+      data = preserveExistingAdminPasswords(data, s.adminAccounts);
+    }
+    if (moduleKey === 'securityConfig') {
+      data = sanitizeSecurityConfig(data);
     }
 
     const newVersion = Math.max(s.version || 1, minVersion || 0) + 1;
@@ -1093,13 +1314,10 @@ class CMSDatabaseManager {
     const s = this.state;
 
     if (batch.adminAccounts && Array.isArray(batch.adminAccounts)) {
-      batch.adminAccounts = batch.adminAccounts.map((acc: AdminAccount) => {
-        const isBcrypt = acc.passwordHash?.startsWith('$2b$') || acc.passwordHash?.startsWith('$2a$');
-        return {
-          ...acc,
-          passwordHash: isBcrypt ? acc.passwordHash : hashPasswordBcrypt(acc.passwordHash || 'Ishwari@Secure2026')
-        };
-      });
+      batch.adminAccounts = preserveExistingAdminPasswords(batch.adminAccounts, s.adminAccounts);
+    }
+    if (batch.securityConfig) {
+      batch.securityConfig = sanitizeSecurityConfig(batch.securityConfig);
     }
 
     const newVersion = Math.max(s.version || 1, minVersion || 0) + 1;
@@ -1280,7 +1498,7 @@ class CMSDatabaseManager {
   public async getUploadedFile(filename: string): Promise<{ base64Data: string; mimeType: string; size: number; category: string } | null> {
     const fileRef = doc(this.firestore, 'uploaded_files', filename);
     const snap = await getDoc(fileRef);
-    if (!snap.exists()) return null;
+    if (!snap.exists) return null;
 
     const data = snap.data();
     let base64Data = typeof data.base64Data === 'string' ? data.base64Data : '';
@@ -1291,7 +1509,7 @@ class CMSDatabaseManager {
           getDoc(doc(this.firestore, 'uploaded_files', `${filename}__chunk__${index}`))
         )
       );
-      if (chunks.some((chunk) => !chunk.exists() || typeof chunk.data().data !== 'string')) {
+      if (chunks.some((chunk) => !chunk.exists || typeof chunk.data().data !== 'string')) {
         throw new Error(`Uploaded media ${filename} is missing one or more storage chunks`);
       }
       base64Data = chunks.map((chunk) => String(chunk.data().data)).join('');
@@ -1309,7 +1527,7 @@ class CMSDatabaseManager {
   public async deleteUploadedFile(filename: string): Promise<void> {
     const fileRef = doc(this.firestore, 'uploaded_files', filename);
     const snap = await getDoc(fileRef);
-    if (!snap.exists()) return;
+    if (!snap.exists) return;
 
     const chunkCount = Number(snap.data().chunkCount) || 0;
     const batch = writeBatch(this.firestore);
@@ -1334,7 +1552,7 @@ class CMSDatabaseManager {
       const snap = await getDoc(probeRef);
       const latencyMs = Date.now() - start;
 
-      if (snap.exists() || this.isInitialLoadDone) {
+      if (snap.exists || this.isInitialLoadDone) {
         return {
           status: 'healthy',
           latencyMs,

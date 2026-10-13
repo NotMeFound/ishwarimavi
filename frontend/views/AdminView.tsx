@@ -211,7 +211,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onResetData,
   onNavigateHome,
 }) => {
-  const effectiveAccounts = adminAccounts && adminAccounts.length > 0 ? adminAccounts : initialAdminAccounts;
+  const effectiveAccounts = adminAccounts || initialAdminAccounts;
 
   const [currentAccount, setCurrentAccount] = useState<AdminAccount | null>(() => {
     const saved = safeSessionStorage.getItem('ishwari_current_account');
@@ -221,7 +221,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       } catch (e) {}
     }
     if (safeSessionStorage.getItem('ishwari_admin_auth') === 'true') {
-      return (adminAccounts && adminAccounts.length > 0 ? adminAccounts : initialAdminAccounts)[0];
+      return effectiveAccounts[0] || null;
     }
     return null;
   });
@@ -356,7 +356,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   });
   const [now, setNow] = useState<number>(Date.now());
 
-  // Emergency PIN Modal (strictly requires Username + Master Key)
+  // Super Admin recovery modal (the secret is held only in server environment settings).
   const [showEmergencyPinModal, setShowEmergencyPinModal] = useState(false);
   const [emergencyUserInput, setEmergencyUserInput] = useState('');
   const [emergencyPinInput, setEmergencyPinInput] = useState('');
@@ -616,8 +616,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     if (isLockedOut) {
       setAuthError(
         t(
-          `Security lockout active. Please wait ${lockoutSecondsRemaining}s or use Master Emergency PIN.`,
-          `सुरक्षा लक सक्रिय छ। कृपया ${lockoutSecondsRemaining} सेकेन्ड पर्खनुहोस् वा मास्टर पिन प्रयोग गर्नुहोस्।`
+          `Security lockout active. Please wait ${lockoutSecondsRemaining}s or use the Super Admin recovery secret.`,
+          `सुरक्षा लक सक्रिय छ। कृपया ${lockoutSecondsRemaining} सेकेन्ड पर्खनुहोस् वा सुपर एडमिन रिकभरी गोप्य साँचो प्रयोग गर्नुहोस्।`
         )
       );
       return;
@@ -718,7 +718,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     if (isRecovering) return;
 
     const trimmedUser = emergencyUserInput.trim().toLowerCase();
-    const pin = emergencyPinInput.trim();
+    const recoverySecret = emergencyPinInput;
 
     if (!trimmedUser) {
       setEmergencyPinError(
@@ -727,16 +727,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
       return;
     }
 
-    if (!pin) {
+    if (!recoverySecret) {
       setEmergencyPinError(
-        t('Master Key / PIN is required.', 'मास्टर की / आपतकालीन पिन आवश्यक छ।')
+        t('The Super Admin recovery secret is required.', 'सुपर एडमिन रिकभरी गोप्य साँचो आवश्यक छ।')
       );
       return;
     }
 
-    if (pin.length !== 6) {
+    if (recoverySecret.length < 32) {
       setEmergencyPinError(
-        t('Recovery PIN must be exactly 6 digits.', 'रिकभरी पिन ठ्याक्कै ६ अङ्कको हुनुपर्छ।')
+        t('The recovery secret must be at least 32 characters.', 'रिकभरी गोप्य साँचो कम्तीमा ३२ अक्षरको हुनुपर्छ।')
       );
       return;
     }
@@ -746,14 +746,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
       const authRes = await apiClient.login({
         username: trimmedUser,
         loginType: 'master_key',
-        masterKey: pin
+        masterKey: recoverySecret
       });
 
       if (!authRes.success || !authRes.account) {
         setEmergencyPinError(
           formatErrorMessage(
             authRes.error,
-            t('Invalid Master Recovery Key or account suspended.', 'गलत मास्टर रिकभरी पिन वा खाता निलम्बनमा छ।')
+            t('Invalid Super Admin recovery secret or account suspended.', 'सुपर एडमिन रिकभरी गोप्य साँचो गलत छ वा खाता निलम्बनमा छ।')
           )
         );
         return;
@@ -778,16 +778,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
       setSessionTimeLeft((securityConfig?.sessionTimeoutMinutes || 30) * 60);
 
       onAddAuditLog({
-        action: 'EMERGENCY_PIN_BYPASS',
+        action: 'SUPER_ADMIN_RECOVERY_LOGIN',
         actor: matchingAccount.username,
         role: matchingAccount.role,
         module: 'AUTH',
         status: 'warning',
         result: 'success',
-        details: `Account unlocked using verified Master Key for administrator "${matchingAccount.username}".`
+        details: `Account accessed using the configured Super Admin recovery secret for "${matchingAccount.username}".`
       });
 
-      showToast(t(`Master Key verified. Welcome, ${matchingAccount.fullName}.`, `मास्टर की प्रमाणित भयो। स्वागत छ, ${matchingAccount.fullName}।`));
+      showToast(t(`Recovery secret verified. Welcome, ${matchingAccount.fullName}.`, `रिकभरी गोप्य साँचो प्रमाणित भयो। स्वागत छ, ${matchingAccount.fullName}।`));
     } catch (err: any) {
       setEmergencyPinError(formatErrorMessage(err, 'Emergency unlock failed'));
     } finally {
@@ -1188,7 +1188,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex items-center justify-center p-4 sm:p-6 relative selection:bg-[#1E40AF] selection:text-white transition-colors duration-200">
-        {/* Emergency Master Recovery PIN Modal (Hidden until triggered) */}
+        {/* Super Admin recovery is available only through the server-configured secret. */}
         {showEmergencyPinModal && (
           <div
             role="dialog"
@@ -1207,7 +1207,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
                     <KeyRound className="w-5 h-5 shrink-0" strokeWidth={2} />
                     <h2 id="recovery-dialog-title" className="text-sm font-bold text-slate-900 dark:text-white">
-                      Emergency Master Recovery PIN
+                      Super Admin Recovery Secret
                     </h2>
                   </div>
                   <button
@@ -1220,7 +1220,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </button>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Enter the 6-digit administrative master recovery PIN configured in institutional security settings.
+                  Enter the high-entropy recovery secret configured in the server environment. This works only for a Super Admin account.
                 </p>
               </div>
 
@@ -1277,47 +1277,32 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="space-y-1.5 text-left">
                   <div className="flex items-center justify-between">
                     <label
-                      htmlFor="recovery-pin-input"
+                      htmlFor="recovery-secret-input"
                       className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
                     >
-                      Master Key (6-Digit Recovery PIN)
+                      Recovery Secret
                     </label>
                     <span className="text-[10px] font-mono text-slate-400">
-                      {emergencyPinInput.length}/6
+                      {emergencyPinInput.length} characters
                     </span>
                   </div>
                   <div className="relative">
                     <input
-                      id="recovery-pin-input"
+                      id="recovery-secret-input"
                       type="password"
-                      maxLength={6}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                      minLength={32}
+                      maxLength={256}
                       value={emergencyPinInput}
                       onChange={(e) => {
                         if (emergencyPinError) setEmergencyPinError('');
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setEmergencyPinInput(val);
+                        setEmergencyPinInput(e.target.value);
                       }}
-                      placeholder="(••••••)"
+                      placeholder="At least 32 characters"
                       autoComplete="off"
                       disabled={isRecovering}
-                      className="w-full h-11 px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-center text-lg font-mono tracking-widest focus:outline-hidden focus:border-[#1E40AF] focus:ring-2 focus:ring-[#1E40AF]/20 transition-all disabled:opacity-60"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-mono focus:outline-hidden focus:border-[#1E40AF] focus:ring-2 focus:ring-[#1E40AF]/20 transition-all disabled:opacity-60"
                       required
                     />
-                  </div>
-                  {/* Interactive PIN progress dots */}
-                  <div className="flex items-center justify-center gap-2 pt-1" aria-hidden="true">
-                    {[0, 1, 2, 3, 4, 5].map((idx) => (
-                      <span
-                        key={idx}
-                        className={`w-2 h-2 rounded-full transition-all duration-150 ${
-                          emergencyPinInput.length > idx
-                            ? 'bg-[#1E40AF] scale-110 shadow-xs'
-                            : 'bg-slate-200 dark:bg-slate-700'
-                        }`}
-                      />
-                    ))}
                   </div>
                 </div>
 
@@ -1332,7 +1317,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={isRecovering || emergencyPinInput.length !== 6 || !emergencyUserInput.trim()}
+                    disabled={isRecovering || emergencyPinInput.length < 32 || !emergencyUserInput.trim()}
                     className="px-4 py-2 rounded-xl text-xs font-bold bg-[#1E40AF] hover:bg-[#1D4ED8] active:bg-[#1E3A8A] text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isRecovering ? (
@@ -1393,7 +1378,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <KeyRound className="w-3.5 h-3.5" strokeWidth={2} />
-                  <span>Emergency Master Recovery PIN</span>
+                  <span>Super Admin Recovery Secret</span>
                 </button>
               </div>
             ) : (
@@ -1567,7 +1552,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   )}
                 </button>
 
-                {/* Secondary Actions: Emergency Master Recovery PIN & Back to Public Portal */}
+                {/* Secondary Actions: Super Admin recovery & Back to Public Portal */}
                 <div className="pt-2 flex flex-col items-center gap-2.5">
                   <button
                     id="admin-emergency-recovery-trigger"
@@ -1577,7 +1562,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-[#1E40AF] dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer hover:underline focus:outline-hidden focus:ring-2 focus:ring-[#1E40AF]/20 rounded-md px-2 py-1"
                   >
                     <KeyRound className="w-3.5 h-3.5" strokeWidth={2} />
-                    <span>Emergency Master Recovery PIN</span>
+                    <span>Super Admin Recovery Secret</span>
                   </button>
 
                   <button

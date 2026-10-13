@@ -154,13 +154,13 @@ export const AdminSystemHubTab: React.FC<AdminSystemHubTabProps> = ({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 {t(
-                  'Configure session security rules, emergency PIN, and download authoritative JSON backups.',
-                  'सत्र समयसीमा, आपतकालीन पिन, र सम्पूर्ण डाटाबेस ब्याकअप व्यवस्थापन गर्नुहोस्।'
+                  'Configure session security rules and download authoritative JSON backups.',
+                  'सत्र सुरक्षा नियम तथा सम्पूर्ण डाटाबेस ब्याकअप व्यवस्थापन गर्नुहोस्।'
                 )}
               </p>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 pt-1 font-mono">
-              <span>Lockout: {securityConfig.maxLoginAttempts} attempts</span>
+              <span>Lockout: {securityConfig.lockoutThreshold} attempts</span>
               <span>•</span>
               <span>100% JSON Backup Ready</span>
             </div>

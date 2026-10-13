@@ -1,11 +1,8 @@
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import express from 'express';
-import dotenv from 'dotenv';
 import { createApp } from './app';
-
-// Load environment variables from .env if present
-dotenv.config();
 
 // Compile-time flag injected by esbuild production builds
 declare const IS_PRODUCTION_BUILD: boolean | undefined;

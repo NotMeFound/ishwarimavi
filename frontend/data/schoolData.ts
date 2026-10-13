@@ -351,28 +351,7 @@ export const initialPrograms: AcademicProgram[] = [
   }
 ];
 
-export const initialMessages: ContactMessage[] = [
-  {
-    id: 1,
-    name: "Subash Thapa",
-    email: "subash.thapa@gmail.com",
-    phone: "9841238901",
-    subject: "Grade 11 Science Stream Admission & Scholarship Test",
-    message: "Namaste, I would like to inquire about the entrance exam syllabus and available merit scholarship quotas for SEE students joining Grade 11 Science.",
-    date: "2083-05-10",
-    status: "new"
-  },
-  {
-    id: 2,
-    name: "Sunita Adhikari",
-    email: "sunita.adhikari@yahoo.com",
-    phone: "9812345678",
-    subject: "Transfer Certificate (TC) and Character Certificate Verification",
-    message: "Respected administration, my daughter completed Grade 8 from Ishwari. We need her official character certificate for transfer documentation.",
-    date: "2083-05-08",
-    status: "reviewed"
-  }
-];
+export const initialMessages: ContactMessage[] = [];
 
 export const initialGallery: GalleryItem[] = [
   { id: 1, title_en: 'Secondary Science Lab Practical Examination', title_np: 'विज्ञान प्रयोगशालामा विद्यार्थीहरूको प्रयोगात्मक अभ्यास', category: 'science', iconType: 'science' },
@@ -995,10 +974,6 @@ export const initialSocialLinks: SocialMediaLink[] = [
 ];
 
 export const initialSecurityConfig: SecurityConfig = {
-  adminUsername: 'admin',
-  adminPassword: 'Ishwari@Secure2026',
-  adminPasswordHash: 'Ishwari@Secure2026',
-  recoveryPin: '782035',
   lockoutThreshold: 5,
   lockoutDurationMinutes: 5,
   sessionTimeoutMinutes: 30,
@@ -1006,26 +981,7 @@ export const initialSecurityConfig: SecurityConfig = {
   hideAdminLinkInHeader: false,
 };
 
-export const initialAuditLogs: SecurityAuditLogEntry[] = [
-  {
-    id: 'log-1',
-    timestamp: '2083-05-12 09:15:22',
-    action: 'SYSTEM_BOOT',
-    actor: 'SYSTEM',
-    status: 'success',
-    severity: 'success',
-    details: 'Institutional security sandbox and database initialized successfully.'
-  },
-  {
-    id: 'log-2',
-    timestamp: '2083-05-12 09:20:00',
-    action: 'ADMIN_LOGIN_SUCCESS',
-    actor: 'admin',
-    status: 'success',
-    severity: 'success',
-    details: 'Authorized master administrator session started.'
-  }
-];
+export const initialAuditLogs: SecurityAuditLogEntry[] = [];
 
 export const initialAboutSections: AboutSection[] = [
   {

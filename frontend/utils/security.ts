@@ -9,14 +9,12 @@ export function hashPasswordBcrypt(password: string): string {
 
 export function verifyPasswordBcrypt(password: string, hash: string): boolean {
   if (!password || !hash) return false;
-  if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
-    try {
-      return bcrypt.compareSync(password, hash);
-    } catch {
-      return false;
-    }
+  if (!/^\$2[aby]\$\d\d\$/.test(hash)) return false;
+  try {
+    return bcrypt.compareSync(password, hash);
+  } catch {
+    return false;
   }
-  return password === hash;
 }
 
 // SHA-256 password hashing with salt using standard Web Crypto API (legacy helper)
@@ -475,60 +473,7 @@ export function upgradeLegacyPermissions(perms: PermissionKey[]): PermissionKey[
   return Array.from(result);
 }
 
-// Initial seeded accounts with modern bcrypt password hashes and explicit hierarchical permissions
-export const initialAdminAccounts: AdminAccount[] = [
-  {
-    id: 'usr_superadmin',
-    username: 'ishwari-superadmin',
-    fullName: 'Master System Administrator (विद्यालय प्रमुख / प्रणाली प्रशासक)',
-    email: 'superadmin@ishwari.edu.np',
-    role: 'super_admin',
-    // bcrypt hash for Ishwari12@
-    passwordHash: '$2b$10$US8/qhy4fZH.GJu5US/g9eEhvTVvB6eQNlnbyK/9t8Ue8jyiZoJ56',
-    salt: 'salt_ishwari_super',
-    status: 'active',
-    permissions: ALL_PERMISSIONS.map(p => p.key),
-    createdAt: '2083-01-01',
-    lastLogin: '2083-05-15 09:30 AM',
-  },
-  {
-    id: 'usr_admin',
-    username: 'ishwari',
-    fullName: 'School Operations Officer (प्रशासन अधिकृत)',
-    email: 'admin@ishwari.edu.np',
-    role: 'admin',
-    // bcrypt hash for Ishwari12@
-    passwordHash: '$2b$10$US8/qhy4fZH.GJu5US/g9eEhvTVvB6eQNlnbyK/9t8Ue8jyiZoJ56',
-    salt: 'salt_ishwari_admin',
-    status: 'active',
-    permissions: [
-      // 1. Website (Identity only)
-      'menu.website',
-      'submenu.website_identity',
-      'settings.view',
-
-      // 2. Content (Notices & Curriculum Guidelines)
-      'menu.content',
-      'submenu.content_notices',
-      'notice.view', 'notice.create', 'notice.update', 'notice.delete',
-      'submenu.content_curriculum',
-      'curriculum.view', 'curriculum.create', 'curriculum.update', 'curriculum.delete',
-
-      // 3. Governance (Teachers & Staff)
-      'menu.governance',
-      'submenu.gov_staff',
-      'teacher.view', 'teacher.create', 'teacher.update',
-      'staff.view', 'staff.create', 'staff.update',
-
-      // 4. Media (Photo Gallery)
-      'menu.media',
-      'submenu.media_gallery',
-      'gallery.view', 'gallery.create', 'gallery.update', 'gallery.delete'
-    ],
-    createdAt: '2083-02-10',
-    lastLogin: '2083-05-14 04:15 PM',
-  },
-];
+export const initialAdminAccounts: AdminAccount[] = [];
 
 /**
  * Strict Hierarchical Permission Verification
@@ -590,17 +535,13 @@ export async function verifyPassword(inputPassword: string, storedHashOrPlain: s
   if (storedHashOrPlain.startsWith('$2a$') || storedHashOrPlain.startsWith('$2b$') || storedHashOrPlain.startsWith('$2y$')) {
     return verifyPasswordBcrypt(inputPassword, storedHashOrPlain);
   }
-  if (inputPassword === storedHashOrPlain) {
-    return true;
-  }
+  if (!salt) return false;
   const hashedInput = await hashPasswordWithSalt(inputPassword, salt);
   return hashedInput === storedHashOrPlain;
 }
 
 // Storage helpers
 export function loadAdminAccounts(): AdminAccount[] {
-  // Database API (/api/cms/state) is the authoritative persistence for admin accounts.
-  // Fall back cleanly to initialAdminAccounts in memory without using localStorage as authoritative storage.
   return initialAdminAccounts;
 }
 
@@ -699,6 +640,4 @@ export function forceClearSessionLock(): void {
 export function saveAdminAccounts(_accounts: AdminAccount[]): void {
   // Authoritative admin account persistence is handled strictly by the database API (/api/cms/sync and /api/admin/accounts)
 }
-
-
 

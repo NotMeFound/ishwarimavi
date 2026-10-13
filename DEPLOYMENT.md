@@ -19,7 +19,7 @@ In production on Render, the application runs as a **single-origin full-stack No
 |   /api/auth/*                  ---> Authentication Service  |
 |   /backend/uploads/*           ---> File Storage            |
 |                                                             |
-|   Database: data/cms_database.json (Atomic persistence)     |
+|   Database: Firestore (Firebase Admin SDK)                  |
 +-------------------------------------------------------------+
 ```
 
@@ -27,6 +27,7 @@ In production on Render, the application runs as a **single-origin full-stack No
 - **Zero CORS issues**: Browser cookies (`ishwari_session`) and Bearer tokens are same-origin.
 - **Single deployment target**: One git push builds and deploys both client and server.
 - **Zero cold-start race conditions**: The React client communicates with the local Express server on the same host.
+- **Server-only database access**: Firestore access uses the Firebase Admin SDK; client reads and writes are denied by `firestore.rules`.
 
 ---
 
@@ -70,14 +71,13 @@ In production on Render, the application runs as a **single-origin full-stack No
 
 ---
 
-## 4. Default Verified Credentials
+## 4. Database and administrator security
 
-- **Super Administrator**:
-  - Username: `ishwari-superadmin`
-  - Password: `Ishwari12@`
-- **School Operations Admin**:
-  - Username: `ishwari`
-  - Password: `Ishwari12@`
-- **Emergency Recovery Master PIN**:
-  - PIN: `782035`
+1. Create a Firebase service account with access only to the Firestore database used by this application. Add its JSON securely as the server-only `FIREBASE_SERVICE_ACCOUNT_JSON` environment variable. Application Default Credentials may be used when provided by the hosting environment.
+2. Set `FIREBASE_PROJECT_ID` and `FIRESTORE_DATABASE_ID` for the intended Firebase project and database.
+3. Before first initialization, configure `SUPER_ADMIN_BOOTSTRAP_USERNAME` and a unique `SUPER_ADMIN_BOOTSTRAP_PASSWORD` of at least 14 characters. The server creates the initial Super Admin from these values. For existing Firestore data containing the published seeded administrator hash, configure these values before deployment so migration replaces the Super Admin credential and disables the other seeded accounts.
+4. Set `SUPER_ADMIN_RECOVERY_SECRET` to a separate, randomly generated secret of at least 32 characters. Store it only in the hosting provider's secret manager.
+5. Deploy the Firestore rules from this repository using the Firebase CLI (`firebase deploy --only firestore:rules --project <FIREBASE_PROJECT_ID>`). The rules deny all direct client access; the trusted server uses the Firebase Admin SDK.
+6. Do not restore or reuse credentials previously published in this repository. Rotate any live administrator credentials and recovery secrets independently, and revoke service-account keys that may have been exposed.
 
+The checked-in `.env.example` contains placeholders only. Never commit service-account credentials, bootstrap passwords, or recovery secrets.

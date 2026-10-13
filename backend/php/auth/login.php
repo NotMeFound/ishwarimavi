@@ -16,12 +16,18 @@ require_once __DIR__ . '/../utils/functions.php';
 use function Backend\Database\getDb;
 use function Backend\Utils\sendJsonResponse;
 use function Backend\Utils\isJsonRequest;
+use function Backend\Utils\verifyCsrf;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendJsonResponse(false, [
         'code' => 'METHOD_NOT_ALLOWED',
         'message' => 'Only POST requests are supported for authentication.'
     ], 405);
+}
+
+if (!isJsonRequest() && !verifyCsrf($_POST['csrf_token'] ?? null)) {
+    header('Location: /frontend/php/admin/login.php?error=' . urlencode('Security token mismatch.'));
+    exit;
 }
 
 // Extract credentials from JSON or POST body
@@ -48,30 +54,22 @@ if (empty($email) || empty($password)) {
     }
 }
 
-// Authenticate against database or baseline configuration
+// Authenticate against the configured database only; never fall back to published credentials.
 $authenticated = false;
 $userRole = 'admin';
 
 $pdo = getDb();
 if ($pdo !== null) {
     try {
-        $stmt = $pdo->prepare('SELECT id, email, password_hash, role FROM users WHERE email = :email LIMIT 1');
-        $stmt->execute(['email' => $email]);
+        $stmt = $pdo->prepare('SELECT id, username, password_hash, full_name FROM admin_users WHERE username = :username LIMIT 1');
+        $stmt->execute(['username' => $email]);
         $user = $stmt->fetch();
         if ($user && password_verify($password, $user['password_hash'])) {
             $authenticated = true;
-            $userRole = $user['role'] ?? 'admin';
+            $userRole = 'admin';
         }
     } catch (\PDOException $e) {
         error_log("[Auth DB Query Error] " . $e->getMessage());
-    }
-}
-
-// Fallback to configured baseline if database is not yet migrated
-if (!$authenticated) {
-    if ($email === ADMIN_EMAIL && $password === ADMIN_PASS) {
-        $authenticated = true;
-        $userRole = 'superadmin';
     }
 }
 

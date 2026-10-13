@@ -91,7 +91,7 @@ export const AboutPhotoReveal: React.FC<AboutPhotoRevealProps> = ({
         </div>
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-transparent" aria-hidden="true" />
+      <div className="absolute inset-0 bg-linear-to-t from-slate-950/75 via-slate-950/10 to-transparent" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-4 text-white transition-opacity duration-200 group-hover:opacity-0 motion-reduce:transition-none">
         <p className="text-base font-bold">{title}</p>
         {localizedCaption && <p className="mb-1 text-xs italic text-white/90">{localizedCaption}</p>}

@@ -21,10 +21,6 @@ define('DB_NAME', getenv('DB_NAME') ?: 'ishwari_school');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 
-// Administrative Authentication Baseline
-define('ADMIN_EMAIL', getenv('ADMIN_EMAIL') ?: 'admin@ishwari.edu.np');
-define('ADMIN_PASS', getenv('ADMIN_PASS') ?: 'admin123');
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

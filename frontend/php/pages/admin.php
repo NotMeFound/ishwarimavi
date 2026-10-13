@@ -28,30 +28,6 @@ if (time() - $_SESSION['last_attempt_time'] > 60) {
     $_SESSION['login_attempts'] = 0;
 }
 
-// Handle Login
-if (isset($_POST['action']) && $_POST['action'] === 'login') {
-    if ($_SESSION['login_attempts'] >= 5) {
-        $loginError = "Too many failed attempts. Security lockout active. Please wait 60 seconds.";
-    } elseif (!$app->verifyCsrf($_POST['csrf_token'] ?? '')) {
-        $loginError = "Security token mismatch.";
-    } else {
-        $username = trim((string)($_POST['username'] ?? ''));
-        $password = trim((string)($_POST['password'] ?? ''));
-
-        // Default secure credential
-        if ($username === 'admin@ishwari.edu.np' && $password === 'admin123') {
-            $_SESSION['is_admin'] = true;
-            $_SESSION['login_attempts'] = 0;
-            $isAdmin = true;
-        } else {
-            $_SESSION['login_attempts']++;
-            $_SESSION['last_attempt_time'] = time();
-            $remaining = 5 - $_SESSION['login_attempts'];
-            $loginError = "Invalid administrative credentials. ({$remaining} attempts remaining before lockout).";
-        }
-    }
-}
-
 // Handle Logout
 if (isset($_GET['act']) && $_GET['act'] === 'logout') {
     $_SESSION['is_admin'] = false;
@@ -117,18 +93,17 @@ $school = $data['school'];
                     </div>
                 <?php endif; ?>
 
-                <form action="/admin.php" method="POST" class="space-y-4 text-xs">
-                    <input type="hidden" name="action" value="login">
+                <form action="/backend/php/auth/login.php" method="POST" class="space-y-4 text-xs">
                     <input type="hidden" name="csrf_token" value="<?= $app->e($csrfToken) ?>">
 
                     <div class="space-y-1">
                         <label class="font-semibold text-slate-700 dark:text-slate-300">Admin Email</label>
-                        <input type="email" name="username" value="admin@ishwari.edu.np" required class="w-full px-3 py-2 rounded bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500">
+                        <input type="email" name="email" autocomplete="username" required class="w-full px-3 py-2 rounded bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500">
                     </div>
 
                     <div class="space-y-1">
-                        <label class="font-semibold text-slate-700 dark:text-slate-300">Master Password</label>
-                        <input type="password" name="password" value="admin123" required class="w-full px-3 py-2 rounded bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500">
+                        <label class="font-semibold text-slate-700 dark:text-slate-300">Password</label>
+                        <input type="password" name="password" autocomplete="current-password" required class="w-full px-3 py-2 rounded bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500">
                     </div>
 
                     <div class="pt-2">
@@ -138,9 +113,7 @@ $school = $data['school'];
                     </div>
 
                     <div class="p-3 rounded bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-500">
-                        <p class="font-semibold text-slate-700 dark:text-slate-300">Demo Administrative Credentials:</p>
-                        <p>User: <code>admin@ishwari.edu.np</code></p>
-                        <p>Pass: <code>admin123</code></p>
+                        Use the administrator account provisioned for this deployment.
                     </div>
                 </form>
             </div>

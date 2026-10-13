@@ -149,7 +149,7 @@ export const AdminSystemSettingsTab: React.FC<AdminSystemSettingsTabProps> = ({
           module: 'SYSTEM_SETTINGS',
           status: 'success',
           result: 'success',
-          details: `Updated session timeout (${securityForm.sessionTimeoutMinutes}m) and lockout threshold (${securityForm.maxLoginAttempts} attempts).`
+          details: `Updated session timeout (${securityForm.sessionTimeoutMinutes}m) and lockout threshold (${securityForm.lockoutThreshold} attempts).`
         });
         onShowToast(t('Security policies saved successfully.', 'सुरक्षा सेटिङहरू सुरक्षित गरियो।'));
       }
@@ -407,18 +407,19 @@ export const AdminSystemSettingsTab: React.FC<AdminSystemSettingsTabProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                {t('Max Failed Login Attempts Before Lockout', 'लकआउट हुनु अघिको अधिकतम गलत प्रयास')}
+                {t('Failed Login Attempts Before Lockout', 'लकआउट हुनु अघिको गलत प्रयास')}
               </label>
-              <input
-                type="number"
-                min="3"
-                max="10"
-                value={securityForm.maxLoginAttempts}
-                onChange={e => setSecurityForm({ ...securityForm, maxLoginAttempts: parseInt(e.target.value) || 5 })}
+              <select
+                value={securityForm.lockoutThreshold}
+                onChange={e => setSecurityForm({ ...securityForm, lockoutThreshold: Number(e.target.value) })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-[#1E40AF]"
-              />
+              >
+                <option value={3}>3</option>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+              </select>
               <p className="text-[11px] text-slate-500 mt-1">
-                {t('IP address or username temporarily locked out after exceeding limit. Default: 5 attempts.', 'सिमा नाघेमा खाता अस्थायी रूपमा रोकिनेछ (डिफल्ट: ५)।')}
+                {t('The server temporarily blocks further attempts after this limit.', 'यो सीमापछि सर्भरले प्रयासहरू अस्थायी रूपमा रोक्छ।')}
               </p>
             </div>
 
@@ -426,33 +427,26 @@ export const AdminSystemSettingsTab: React.FC<AdminSystemSettingsTabProps> = ({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 {t('Account Lockout Duration (Minutes)', 'लकआउट अवधि (मिनेट)')}
               </label>
-              <input
-                type="number"
-                min="5"
-                max="120"
+              <select
                 value={securityForm.lockoutDurationMinutes}
-                onChange={e => setSecurityForm({ ...securityForm, lockoutDurationMinutes: parseInt(e.target.value) || 15 })}
+                onChange={e => setSecurityForm({ ...securityForm, lockoutDurationMinutes: Number(e.target.value) })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-[#1E40AF]"
-              />
+              >
+                <option value={3}>3 minutes</option>
+                <option value={5}>5 minutes</option>
+                <option value={15}>15 minutes</option>
+                <option value={30}>30 minutes</option>
+              </select>
               <p className="text-[11px] text-slate-500 mt-1">
-                {t('Duration an account remains locked after failed attempts. Default: 15 minutes.', 'लकआउट भइसकेपछि खुल्न लाग्ने समय (डिफल्ट: १५ मिनेट)।')}
+                {t('Duration an account remains locked after failed attempts. Use 3, 5, 15, or 30 minutes.', 'लकआउट समय ३, ५, १५ वा ३० मिनेटमध्ये छान्नुहोस्।')}
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                {t('Emergency SuperAdmin Master PIN', 'आपतकालीन मास्टर पिन (PIN)')}
-              </label>
-              <input
-                type="password"
-                maxLength={8}
-                value={securityForm.emergencyPin || '8301'}
-                onChange={e => setSecurityForm({ ...securityForm, emergencyPin: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white font-mono focus:ring-2 focus:ring-[#1E40AF]"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">
-                {t('Used for emergency console unlock and factory reset authorization.', 'आपतकालीन कन्सोल अनलक र रिसेट प्रमाणीकरणको लागि प्रयोग गरिन्छ।')}
-              </p>
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs leading-relaxed text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+              {t(
+                'Super Admin recovery uses a high-entropy server environment secret. It cannot be viewed or changed in this settings screen.',
+                'सुपर एडमिन रिकभरीका लागि सर्भर वातावरणमा उच्च-एन्ट्रोपी गोप्य साँचो प्रयोग हुन्छ। यस सेटिङबाट हेर्न वा परिवर्तन गर्न मिल्दैन।'
+              )}
             </div>
           </div>
 

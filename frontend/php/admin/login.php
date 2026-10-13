@@ -10,6 +10,9 @@ declare(strict_types=1);
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // If already authenticated by backend session, forward to dashboard
 if (!empty($_SESSION['is_admin'])) {
@@ -52,9 +55,10 @@ $message = isset($_GET['message']) ? htmlspecialchars((string)$_GET['message'], 
 
         <!-- Form action points to backend authentication endpoint -->
         <form action="/backend/php/auth/login.php" method="POST" class="space-y-4 text-xs">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
             <div class="space-y-1">
                 <label class="text-slate-300 font-semibold">Email</label>
-                <input type="email" name="email" value="admin@ishwari.edu.np" required class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500">
+                <input type="email" name="email" required autocomplete="username" class="w-full px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-500">
             </div>
             <div class="space-y-1">
                 <label class="text-slate-300 font-semibold">Password</label>

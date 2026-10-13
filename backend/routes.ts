@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { db, ServerSession, verifyPasswordBcrypt, hashPasswordBcrypt } from './db';
+import { db, ServerSession, verifyPasswordBcrypt, hashPasswordBcrypt, verifyRecoverySecret } from './db';
 import { AdminAccount } from './types';
 
 export const apiRouter = express.Router();
@@ -136,21 +136,35 @@ apiRouter.get('/cms/state', async (req: Request, res: Response, next: NextFuncti
     return;
   }
   const state = db.getState();
+  const publicData = db.getPublicState();
 
-  // If authenticated admin session, provide full operational data (sanitizing password hashes)
   if (session) {
-    const sanitizedAccounts = state.adminAccounts.map((acc) => ({
-      ...acc,
-      passwordHash: '[PROTECTED_BCRYPT_HASH]'
-    }));
-
-    res.json({
-      success: true,
-      authenticated: true,
-      role: session.role,
-      version: state.version,
-      lastModified: state.lastModified,
-      data: {
+    const data: Record<string, unknown> = { ...publicData };
+    if (session.role === 'super_admin') {
+      data.school = state.school;
+      data.aboutSections = state.aboutSections || [];
+      data.notices = state.notices;
+      data.vacancies = state.vacancies || [];
+      data.staff = state.staff;
+      data.facilities = state.facilities;
+      data.programs = state.programs;
+      data.documents = state.documents;
+      data.curriculumGuidelines = state.curriculumGuidelines || [];
+      data.messages = state.messages;
+      data.events = state.events;
+      data.achievements = state.achievements;
+      data.history = state.history;
+      data.gallery = state.gallery;
+      data.faqs = state.faqs || [];
+      data.siteConfig = state.siteConfig;
+      data.securityConfig = state.securityConfig;
+      data.auditLogs = state.auditLogs;
+      data.adminAccounts = state.adminAccounts.map((account) => ({
+        ...account,
+        passwordHash: ''
+      }));
+    } else {
+      const moduleData: Record<string, unknown> = {
         school: state.school,
         aboutSections: state.aboutSections || [],
         notices: state.notices,
@@ -160,23 +174,51 @@ apiRouter.get('/cms/state', async (req: Request, res: Response, next: NextFuncti
         programs: state.programs,
         documents: state.documents,
         curriculumGuidelines: state.curriculumGuidelines || [],
-        messages: state.messages,
         events: state.events,
         achievements: state.achievements,
         history: state.history,
         gallery: state.gallery,
         faqs: state.faqs || [],
-        siteConfig: state.siteConfig,
-        securityConfig: state.securityConfig,
-        auditLogs: state.auditLogs,
-        adminAccounts: sanitizedAccounts
+        siteConfig: state.siteConfig
+      };
+      const modulePermissions: Array<[string, string]> = [
+        ['school', 'school'],
+        ['aboutSections', 'aboutSections'],
+        ['notices', 'notices'],
+        ['vacancies', 'vacancies'],
+        ['staff', 'staff'],
+        ['facilities', 'facilities'],
+        ['programs', 'programs'],
+        ['documents', 'documents'],
+        ['curriculumGuidelines', 'curriculumGuidelines'],
+        ['events', 'events'],
+        ['achievements', 'achievements'],
+        ['history', 'history'],
+        ['gallery', 'gallery'],
+        ['faqs', 'faqs'],
+        ['siteConfig', 'siteConfig']
+      ];
+      for (const [payloadKey, permissionModule] of modulePermissions) {
+        if (db.checkPermission(session, permissionModule).allowed) {
+          data[payloadKey] = moduleData[payloadKey];
+        }
       }
+      if (db.checkPermission(session, 'messages').allowed) data.messages = state.messages;
+      if (db.checkPermission(session, 'auditLogs').allowed) data.auditLogs = state.auditLogs;
+      if (session.permissions.includes('security.view')) data.securityConfig = state.securityConfig;
+    }
+
+    res.json({
+      success: true,
+      authenticated: true,
+      role: session.role,
+      version: state.version,
+      lastModified: state.lastModified,
+      data
     });
     return;
   }
 
-  // Unauthenticated public visitors receive sanitized public state
-  const publicData = db.getPublicState();
   res.json({
     success: true,
     authenticated: false,
@@ -206,7 +248,7 @@ apiRouter.get('/cms/version', async (req: Request, res: Response, next: NextFunc
 
 // 3.1 Public Module Convenience Endpoints
 apiRouter.get('/notices', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().notices || [] });
+  res.json({ success: true, data: db.getPublicState().notices || [] });
 });
 
 apiRouter.get('/gallery', async (req: Request, res: Response, next: NextFunction) => {
@@ -220,15 +262,15 @@ apiRouter.get('/gallery', async (req: Request, res: Response, next: NextFunction
 });
 
 apiRouter.get('/teachers', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().staff || [] });
+  res.json({ success: true, data: db.getPublicState().staff || [] });
 });
 
 apiRouter.get('/staff', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().staff || [] });
+  res.json({ success: true, data: db.getPublicState().staff || [] });
 });
 
 apiRouter.get('/programs', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().programs || [] });
+  res.json({ success: true, data: db.getPublicState().programs || [] });
 });
 
 apiRouter.get('/alumni', (req: Request, res: Response) => {
@@ -236,15 +278,15 @@ apiRouter.get('/alumni', (req: Request, res: Response) => {
 });
 
 apiRouter.get('/faqs', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().faqs || [] });
+  res.json({ success: true, data: db.getPublicState().faqs || [] });
 });
 
 apiRouter.get('/events', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().events || [] });
+  res.json({ success: true, data: db.getPublicState().events || [] });
 });
 
 apiRouter.get('/facilities', (req: Request, res: Response) => {
-  res.json({ success: true, data: db.getState().facilities || [] });
+  res.json({ success: true, data: db.getPublicState().facilities || [] });
 });
 
 // 4. Real-time Synchronization Stream (Server-Sent Events)
@@ -476,23 +518,18 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
   const isMasterKeyAttempt = loginType === 'master_key' || (masterKey && masterKey.trim().length > 0);
 
   if (isMasterKeyAttempt) {
-    // Admin Master Key Authentication:
-    // Requires Username + Master Key
-    // Master Key must NEVER by itself authenticate a user.
-    // The role identity MUST come from the authoritative user/account record.
-    // A Master Key login MUST NEVER downgrade or upgrade roles!
-    const enteredPin = String(masterKey || password || '').trim();
-    const authoritativeRecoveryPin = state.securityConfig?.recoveryPin?.trim();
+    const enteredSecret = String(masterKey || password || '').trim();
+    const recoverySecret = process.env.SUPER_ADMIN_RECOVERY_SECRET;
 
-    if (!authoritativeRecoveryPin) {
+    if (!recoverySecret || recoverySecret.length < 32) {
       res.status(500).json({
         success: false,
-        error: 'Institutional recovery PIN is not configured on the server. Please contact system administrator.'
+        error: 'The Super Admin recovery mechanism is not securely configured on the server.'
       });
       return;
     }
 
-    if (enteredPin === authoritativeRecoveryPin) {
+    if (matchingAccount.role === 'super_admin' && verifyRecoverySecret(enteredSecret, recoverySecret)) {
       isAuthenticated = true;
     } else {
       const rateResult = db.recordFailedAttempt(rateLimitId);
@@ -509,7 +546,7 @@ export const handleAdminLogin = async (req: Request, res: Response) => {
 
       res.status(401).json({
         success: false,
-        error: 'Invalid Master Recovery Key.',
+        error: 'Invalid Super Admin recovery secret.',
         remainingAttempts: rateResult.remainingAttempts,
         isLocked: rateResult.isLocked,
         lockoutSeconds: rateResult.remainingSeconds
@@ -752,8 +789,8 @@ apiRouter.post('/auth/change-password', requireAuth, async (req: Request, res: R
     return;
   }
 
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+  if (typeof newPassword !== 'string' || newPassword.length < 14) {
+    res.status(400).json({ success: false, error: 'New password must be at least 14 characters long.' });
     return;
   }
 

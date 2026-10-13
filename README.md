@@ -44,7 +44,7 @@ ishwari-secondary-school/
 │       ├── api/                            # Backend JSON API endpoints (notices.php, settings.php, health.php)
 │       └── utils/                          # Security helpers, CSRF verification, input sanitization
 │
-├── data/                                   # Database compatibility directory (cms_database.json)
+├── data/                                   # Legacy database snapshot (not authoritative runtime storage)
 ├── public/                                 # Static public assets (icons, favicons, manifest)
 ├── dist/                                   # Compiled production distribution (client SPA + server bundles)
 │   ├── index.html                          # Bundled client SPA
@@ -73,7 +73,7 @@ ishwari-secondary-school/
 ### Backend Rules Enforced
 - **JSON API Standard**: All API endpoints return consistent JSON responses (`{ success: true, data: ... }` or `{ success: false, error: ... }`).
 - **Server-Side Security**: Password hashing with bcrypt, session and JWT management, rate limiting, and RBAC authorization live exclusively in `backend/`.
-- **Authoritative Storage**: Persistent state is managed in `backend/database/` with ACID-like atomic writes and automated backups.
+- **Authoritative Storage**: Persistent CMS state, administrator accounts, and sessions are managed in Firestore through the Firebase Admin SDK. Firestore rules deny direct client access. The checked-in JSON database files are legacy snapshots, not authoritative runtime storage.
 
 ---
 

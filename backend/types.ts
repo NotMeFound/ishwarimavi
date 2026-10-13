@@ -815,13 +815,7 @@ export interface SocialMediaLink {
 }
 
 export interface SecurityConfig {
-  adminUsername: string;
-  adminPassword?: string;
-  adminPasswordHash: string;
-  recoveryPin: string;
-  emergencyPin?: string;
   lockoutThreshold: number;
-  maxLoginAttempts?: number;
   lockoutDurationMinutes: number;
   sessionTimeoutMinutes: number;
   adminRouteSlug: string; // default 'admin-portal'

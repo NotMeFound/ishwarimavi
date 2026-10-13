@@ -75,7 +75,7 @@ export interface AuthoritativeCMSData {
   documents: DocumentItem[];
   publications?: PublicationItem[];
   curriculumGuidelines?: CurriculumGuideline[];
-  messages: ContactMessage[];
+  messages?: ContactMessage[];
   events: SchoolEvent[];
   achievements: Achievement[];
   history: HistoryItem[];
@@ -83,8 +83,8 @@ export interface AuthoritativeCMSData {
   faqs?: SchoolFAQItem[];
   siteConfig: SiteCustomizerConfig;
   securityConfig: SecurityConfig;
-  auditLogs: SecurityAuditLogEntry[];
-  adminAccounts: AdminAccount[];
+  auditLogs?: SecurityAuditLogEntry[];
+  adminAccounts?: AdminAccount[];
 }
 
 export interface CMSStateResponse {
