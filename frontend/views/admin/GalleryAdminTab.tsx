@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { AlertCircle, Eye, EyeOff, Image as ImageIcon, Loader2, Pencil, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Image as ImageIcon, Loader2, Pencil, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react';
 import { Language, GalleryItem } from '../../types';
 import { apiClient, getApiUrl } from '../../services/apiClient';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
@@ -55,6 +55,11 @@ function getStoredImagePath(image: string): string | null {
   }
 }
 
+function isUnpublished(item: GalleryItem): boolean {
+  return item.status === 'unpublished' || item.status === 'draft' ||
+    item.published === false || item.is_published === false || item.is_enabled === false;
+}
+
 const GalleryThumbnail: React.FC<{ item: GalleryItem; className?: string }> = ({ item, className = '' }) => {
   const [failed, setFailed] = useState(false);
   const image = getImageUrl(item);
@@ -85,10 +90,17 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
   canDelete = true
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replacementTargetRef = useRef<GalleryItem | null>(null);
   const [selected, setSelected] = useState<SelectedPhoto[]>([]);
   const [category, setCategory] = useState<GalleryItem['category']>('academics');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | GalleryItem['category']>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'unpublished'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [replacingId, setReplacingId] = useState<GalleryItem['id'] | null>(null);
+  const [replacementError, setReplacementError] = useState('');
   const [uploadProgress, setUploadProgress] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -147,6 +159,121 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
     setSelected((previous) => previous.map((photo, itemIndex) =>
       itemIndex === index ? { ...photo, [key]: value } : photo
     ));
+  };
+
+  const openReplacePicker = (item: GalleryItem) => {
+    replacementTargetRef.current = item;
+    setReplacementError('');
+    replaceInputRef.current?.click();
+  };
+
+  const replacePhoto = async (item: GalleryItem, file: File) => {
+    const extension = `.${file.name.split('.').pop()?.toLowerCase() || ''}`;
+    const extensionAllowed = Object.values(ACCEPTED_IMAGE_TYPES).some((value) => value.split(',').includes(extension));
+    const mimeTypeAllowed = !file.type || Object.entries(ACCEPTED_IMAGE_TYPES).some(
+      ([mime, extensions]) => mime === file.type && extensions.split(',').includes(extension)
+    );
+    if (!extensionAllowed || !mimeTypeAllowed) {
+      setReplacementError(t('Choose a JPG, PNG, or WebP image.', 'JPG, PNG वा WebP तस्बिर छान्नुहोस्।'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setReplacementError(t('The replacement image must be 1 MB or smaller.', 'प्रतिस्थापन तस्बिर १ MB वा कम हुनुपर्छ।'));
+      return;
+    }
+
+    setReplacingId(item.id);
+    setReplacementError('');
+    let uploadedUrl = '';
+    try {
+      const uploaded = await apiClient.uploadFile({
+        fileName: file.name,
+        fileType: file.type,
+        base64Data: await readFileAsDataUrl(file),
+        category: 'gallery',
+        operation: 'replace'
+      });
+      if (!uploaded.success || !uploaded.url) {
+        setReplacementError(uploaded.error || t('The replacement photo could not be uploaded.', 'प्रतिस्थापन तस्बिर अपलोड भएन।'));
+        return;
+      }
+
+      uploadedUrl = uploaded.url;
+      const nextGallery = gallery.map((photo) => photo.id === item.id
+        ? { ...photo, image: uploadedUrl, url: uploadedUrl }
+        : photo);
+      const saved = await onUpdateGallery(nextGallery);
+      if (!saved) {
+        const storedPath = getStoredImagePath(uploadedUrl);
+        let cleanedUp = true;
+        if (storedPath) {
+          try {
+            const response = await fetch(getApiUrl(storedPath), {
+              method: 'DELETE',
+              headers: { ...apiClient.getAuthHeaders() },
+              credentials: 'include'
+            });
+            cleanedUp = response.ok;
+          } catch {
+            cleanedUp = false;
+          }
+        }
+        setReplacementError(cleanedUp
+          ? t('Could not save the replacement. Your original photo is unchanged; please retry.', 'प्रतिस्थापन सुरक्षित भएन। पुरानो तस्बिर यथावत् छ; पुनः प्रयास गर्नुहोस्।')
+          : t('Could not save the replacement or clean up its upload. Your original photo is unchanged.', 'प्रतिस्थापन सुरक्षित वा अपलोड सफा गर्न सकिएन। पुरानो तस्बिर यथावत् छ।'));
+        return;
+      }
+
+      const previousPath = getStoredImagePath(getImageUrl(item));
+      const isShared = previousPath && gallery.some((photo) =>
+        photo.id !== item.id && getStoredImagePath(getImageUrl(photo)) === previousPath
+      );
+      let oldFileRemoved = true;
+      if (previousPath && !isShared) {
+        try {
+          const response = await fetch(getApiUrl(previousPath), {
+            method: 'DELETE',
+            headers: { ...apiClient.getAuthHeaders() },
+            credentials: 'include'
+          });
+          oldFileRemoved = response.ok;
+        } catch {
+          oldFileRemoved = false;
+        }
+      }
+      onShowToast(oldFileRemoved
+        ? t('Photo replaced successfully.', 'तस्बिर सफलतापूर्वक प्रतिस्थापन गरियो।')
+        : t('Photo replaced, but the old image file could not be removed.', 'तस्बिर प्रतिस्थापन भयो तर पुरानो फाइल हटाउन सकिएन।'));
+    } catch (error) {
+      let cleanupFailed = false;
+      const storedPath = uploadedUrl ? getStoredImagePath(uploadedUrl) : null;
+      if (storedPath) {
+        try {
+          const response = await fetch(getApiUrl(storedPath), {
+            method: 'DELETE',
+            headers: { ...apiClient.getAuthHeaders() },
+            credentials: 'include'
+          });
+          cleanupFailed = !response.ok;
+        } catch {
+          cleanupFailed = true;
+        }
+      }
+      setReplacementError([
+        error instanceof Error ? error.message : t('The replacement photo could not be saved.', 'प्रतिस्थापन तस्बिर सुरक्षित भएन।'),
+        cleanupFailed ? t('The uploaded file could not be cleaned up.', 'अपलोड गरिएको फाइल सफा गर्न सकिएन।') : ''
+      ].filter(Boolean).join(' '));
+    } finally {
+      setReplacingId(null);
+    }
+  };
+
+  const handleReplaceFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const target = replacementTargetRef.current;
+    replacementTargetRef.current = null;
+    event.target.value = '';
+    if (file && target) void replacePhoto(target, file);
   };
 
   const uploadSelected = async () => {
@@ -297,6 +424,16 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
     setIsDeleting(false);
   };
 
+  const visibleGallery = gallery.filter((item) => {
+    const unpublished = isUnpublished(item);
+    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+    const matchesStatus = statusFilter === 'all' || (statusFilter === 'unpublished' ? unpublished : !unpublished);
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+    const matchesSearch = !normalizedQuery ||
+      `${item.title_en} ${item.title_np} ${item.category}`.toLocaleLowerCase().includes(normalizedQuery);
+    return matchesCategory && matchesStatus && matchesSearch;
+  });
+
   return (
     <div className="space-y-5">
       <ConfirmationModal
@@ -311,31 +448,43 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
         isLoading={isDeleting}
       />
 
+      {canUpdate && (
+        <input
+          ref={replaceInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          onChange={handleReplaceFileChange}
+          className="hidden"
+        />
+      )}
+
       <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              {t('Add Gallery Photos', 'ग्यालरीमा तस्बिर थप्नुहोस्')}
+              {canCreate ? t('Add Gallery Photos', 'ग्यालरीमा तस्बिर थप्नुहोस्') : t('Manage Gallery Photos', 'ग्यालरीका तस्बिर व्यवस्थापन')}
             </h3>
             <p className="mt-0.5 text-xs text-slate-500">
               {t('JPG, PNG, or WebP · up to 1 MB each', 'JPG, PNG वा WebP · प्रत्येक १ MB सम्म')}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-            <span>{t('Album', 'श्रेणी')}</span>
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value as GalleryItem['category'])}
-              disabled={isUploading}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800"
-            >
-              <option value="academics">Academics</option>
-              <option value="science">Science & Tech</option>
-              <option value="sports">Sports</option>
-              <option value="culture">Culture</option>
-              <option value="community">Community</option>
-            </select>
-          </label>
+          {canCreate && (
+            <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span>{t('Album', 'श्रेणी')}</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value as GalleryItem['category'])}
+                disabled={isUploading}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800"
+              >
+                <option value="academics">Academics</option>
+                <option value="science">Science & Tech</option>
+                <option value="sports">Sports</option>
+                <option value="culture">Culture</option>
+                <option value="community">Community</option>
+              </select>
+            </label>
+          )}
         </div>
 
         {canCreate && (
@@ -437,17 +586,73 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
         )}
       </section>
 
+      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t('Photo library', 'तस्बिर सङ्ग्रह')}</h3>
+            <p className="text-xs text-slate-500">
+              {t(`${gallery.length} total · ${visibleGallery.length} shown`, `जम्मा ${gallery.length} · ${visibleGallery.length} देखाइएका`)}
+            </p>
+          </div>
+          <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-3">
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={t('Search captions…', 'शीर्षक खोज्नुहोस्…')}
+                aria-label={t('Search gallery photos', 'ग्यालरी तस्बिर खोज्नुहोस्')}
+                className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-8 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800 sm:min-w-48"
+              />
+            </label>
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value as 'all' | GalleryItem['category'])}
+              aria-label={t('Filter by album', 'श्रेणी अनुसार छान्नुहोस्')}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              <option value="all">{t('All albums', 'सबै श्रेणी')}</option>
+              <option value="academics">Academics</option>
+              <option value="science">Science & Tech</option>
+              <option value="sports">Sports</option>
+              <option value="culture">Culture</option>
+              <option value="community">Community</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | 'published' | 'unpublished')}
+              aria-label={t('Filter by publication status', 'प्रकाशन अवस्था अनुसार छान्नुहोस्')}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            >
+              <option value="all">{t('All statuses', 'सबै अवस्था')}</option>
+              <option value="published">{t('Published', 'प्रकाशित')}</option>
+              <option value="unpublished">{t('Unpublished', 'अप्रकाशित')}</option>
+            </select>
+          </div>
+        </div>
+        {replacementError && (
+          <p role="alert" className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {replacementError}
+          </p>
+        )}
+      </section>
+
       {gallery.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700">
           {t('No gallery photos yet.', 'ग्यालरीमा कुनै तस्बिर छैन।')}
         </div>
+      ) : visibleGallery.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-slate-500 dark:border-slate-700">
+          {t('No photos match these filters.', 'यी छनोटसँग मिल्ने तस्बिर भेटिएनन्।')}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {gallery.map((item) => {
-            const unpublished =
-              item.status === 'unpublished' || item.status === 'draft' ||
-              item.published === false || item.is_published === false || item.is_enabled === false;
+          {visibleGallery.map((item) => {
+            const unpublished = isUnpublished(item);
             const isEditing = editing?.id === item.id;
+            const isReplacing = replacingId === item.id;
             return (
               <article key={item.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <div className="relative flex h-44 items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -504,7 +709,18 @@ export const GalleryAdminTab: React.FC<GalleryAdminTabProps> = ({
                             <button type="button" onClick={() => setEditing({ ...item })} aria-label={t('Edit caption', 'शीर्षक सम्पादन')} className="rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-700 dark:hover:bg-slate-800">
                               <Pencil className="h-4 w-4" />
                             </button>
-                            <button type="button" onClick={() => void togglePublished(item)} disabled={isSaving} aria-label={unpublished ? t('Publish photo', 'प्रकाशित गर्नुहोस्') : t('Unpublish photo', 'अप्रकाशित गर्नुहोस्')} className="rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-700 disabled:opacity-50 dark:hover:bg-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => openReplacePicker(item)}
+                              disabled={replacingId !== null}
+                              aria-label={t('Replace photo', 'तस्बिर प्रतिस्थापन गर्नुहोस्')}
+                              title={t('Replace photo', 'तस्बिर प्रतिस्थापन गर्नुहोस्')}
+                              className="inline-flex min-h-9 items-center gap-1 rounded px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
+                            >
+                              {isReplacing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                              <span>{isReplacing ? t('Replacing…', 'प्रतिस्थापन हुँदैछ…') : t('Replace', 'बदल्नुहोस्')}</span>
+                            </button>
+                            <button type="button" onClick={() => void togglePublished(item)} disabled={isSaving || replacingId !== null} aria-label={unpublished ? t('Publish photo', 'प्रकाशित गर्नुहोस्') : t('Unpublish photo', 'अप्रकाशित गर्नुहोस्')} className="rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-700 disabled:opacity-50 dark:hover:bg-slate-800">
                               {unpublished ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                             </button>
                           </>

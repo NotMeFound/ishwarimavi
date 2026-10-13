@@ -373,6 +373,7 @@ export interface AboutSection {
   image_caption_en?: string;
   image_caption_np?: string;
   image_position?: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  image_display_mode?: 'foreground' | 'background';
   background_source?: 'upload' | 'url';
   background_media_type?: 'image' | 'gif';
   display_order: number;

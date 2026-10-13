@@ -266,6 +266,7 @@ export const CmsMediaBackgroundControl: React.FC<CmsMediaBackgroundControlProps>
         const base64Data = e.target?.result as string;
         if (!base64Data) {
           setIsUploading(false);
+          onShowToast(t('Could not read the selected media file.', 'छानिएको मिडिया फाइल पढ्न सकिएन।'));
           return;
         }
 
@@ -291,9 +292,8 @@ export const CmsMediaBackgroundControl: React.FC<CmsMediaBackgroundControlProps>
             category: category || 'about'
           });
 
-          if (uploadRes.success) {
-            const serverUrl = uploadRes.url || base64Data;
-            onMediaChange(serverUrl, 'upload', detectedType);
+          if (uploadRes.success && uploadRes.url) {
+            onMediaChange(uploadRes.url, 'upload', detectedType);
             onShowToast(
               t(
                 `${detectedType === 'gif' ? 'Animated GIF' : 'Background image'} uploaded successfully!`,
@@ -302,18 +302,13 @@ export const CmsMediaBackgroundControl: React.FC<CmsMediaBackgroundControlProps>
             );
             setIsUploading(false);
             return;
-          } else if (uploadRes.error) {
-            onShowToast(uploadRes.error);
-            setIsUploading(false);
-            return;
           }
-        } catch {
-          // Fallback to base64 if network is unavailable
+          onShowToast(uploadRes.error || t('Media upload failed. Please try again.', 'मिडिया अपलोड असफल भयो। कृपया पुनः प्रयास गर्नुहोस्।'));
+        } catch (error) {
+          onShowToast(error instanceof Error
+            ? error.message
+            : t('Media upload failed. Check your connection and try again.', 'मिडिया अपलोड असफल भयो। इन्टरनेट जाँच गरी पुनः प्रयास गर्नुहोस्।'));
         }
-
-        // Direct fallback
-        onMediaChange(base64Data, 'upload', detectedType);
-        onShowToast(t('Media loaded successfully!', 'मिडिया सफलतापूर्वक लोड गरियो!'));
         setIsUploading(false);
       };
 

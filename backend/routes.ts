@@ -1388,11 +1388,15 @@ apiRouter.post('/cms/upload', requireAuth, async (req: Request, res: Response) =
     return;
   } else if (category === 'gallery') {
     const galleryPermission = db.checkPermission(session, 'gallery');
+    const requiredPermission = req.body?.operation === 'replace' ? 'gallery.update' : 'gallery.create';
     if (
       !galleryPermission.allowed ||
-      (session.role !== 'super_admin' && !session.permissions.includes('gallery.create'))
+      (session.role !== 'super_admin' && !session.permissions.includes(requiredPermission))
     ) {
-      res.status(403).json({ success: false, error: galleryPermission.reason || 'Gallery create permission is required.' });
+      res.status(403).json({
+        success: false,
+        error: galleryPermission.reason || `Gallery ${requiredPermission === 'gallery.update' ? 'update' : 'create'} permission is required.`
+      });
       return;
     }
 
@@ -1499,21 +1503,36 @@ apiRouter.get('/gallery/file/:filename', async (req: Request, res: Response) => 
 apiRouter.delete('/gallery/file/:filename', requireAuth, async (req: Request, res: Response) => {
   const session = (req as any).session as ServerSession;
   const galleryPermission = db.checkPermission(session, 'gallery');
+  const filename = path.basename(req.params.filename);
+  const canDelete = session.role === 'super_admin' || session.permissions.includes('gallery.delete');
+  const canCleanUnusedFile = session.role === 'super_admin' || session.permissions.includes('gallery.update');
   if (
     !galleryPermission.allowed ||
-    (session.role !== 'super_admin' && !session.permissions.includes('gallery.delete'))
+    (!canDelete && !canCleanUnusedFile)
   ) {
-    res.status(403).json({ success: false, error: galleryPermission.reason || 'Gallery delete permission is required.' });
+    res.status(403).json({ success: false, error: galleryPermission.reason || 'Gallery delete or update permission is required.' });
     return;
   }
 
-  const filename = path.basename(req.params.filename);
   if (!/^gallery-[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
     res.status(400).json({ success: false, error: 'Invalid gallery image identifier' });
     return;
   }
 
   try {
+    const imagePath = `/api/gallery/file/${filename}`;
+    const isStillReferenced = (db.getState().gallery || []).some((item) => {
+      const image = item.image || item.url || '';
+      try {
+        return new URL(image, 'http://localhost').pathname === imagePath;
+      } catch {
+        return false;
+      }
+    });
+    if (isStillReferenced && !canDelete) {
+      res.status(403).json({ success: false, error: 'An image can only be cleaned up after it is no longer used in the gallery.' });
+      return;
+    }
     const storedFile = await db.getUploadedFile(filename);
     if (storedFile?.category === 'gallery') {
       await db.deleteUploadedFile(filename);

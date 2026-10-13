@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
+import { getApiUrl } from '../utils/apiUrl';
 
 export interface InlineImageData {
   url: string;
@@ -240,7 +241,7 @@ export const AboutContentRenderer: React.FC<AboutContentRendererProps> = ({
       >
         <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-slate-900 shadow-2xs">
           <img
-            src={img.url}
+            src={getApiUrl(img.url)}
             alt={img.alt || 'School photograph'}
             loading="lazy"
             referrerPolicy="no-referrer"

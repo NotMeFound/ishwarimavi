@@ -881,6 +881,7 @@ class APIClient {
     fileType: string;
     base64Data: string;
     category: string;
+    operation?: 'replace';
   }): Promise<{ success: boolean; url?: string; fileName?: string; uniqueFileName?: string; size?: number; error?: string }> {
     try {
       const url = getApiUrl('/api/cms/upload');

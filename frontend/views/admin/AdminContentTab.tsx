@@ -133,6 +133,7 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
     image_caption_en: '',
     image_caption_np: '',
     image_position: 'center',
+    image_display_mode: 'foreground',
     display_order: (effectiveAboutSections.length + 1),
     status: 'published',
     is_enabled: true,
@@ -420,6 +421,7 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
         image_caption_en: aboutForm.image_caption_en || '',
         image_caption_np: aboutForm.image_caption_np || '',
         image_position: aboutForm.image_position || 'center',
+        image_display_mode: aboutForm.image_display_mode || 'foreground',
         display_order: Number(aboutForm.display_order) || (currentList.length + 1),
         status: aboutForm.status || 'published',
         is_enabled: aboutForm.is_enabled !== undefined ? aboutForm.is_enabled : true,
@@ -443,6 +445,7 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
       image_caption_en: '',
       image_caption_np: '',
       image_position: 'center',
+      image_display_mode: 'foreground',
       display_order: effectiveAboutSections.length + 2,
       status: 'published',
       is_enabled: true,
@@ -457,6 +460,7 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
     setEditingAboutId(section.id);
     setAboutForm({
       ...section,
+      image_display_mode: section.image_display_mode || 'foreground',
       background_source: section.background_source || (section.image?.startsWith('http') ? 'url' : 'upload'),
       background_media_type: section.background_media_type || (section.image?.toLowerCase().endsWith('.gif') ? 'gif' : 'image')
     });
@@ -478,6 +482,8 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
       background_media_type: 'image',
       image_caption_en: '',
       image_caption_np: '',
+      image_position: 'center',
+      image_display_mode: 'foreground',
       display_order: effectiveAboutSections.length + 1,
       status: 'published',
       is_enabled: true,
@@ -1058,6 +1064,26 @@ export const AdminContentTab: React.FC<AdminContentTabProps> = ({
 
                     {aboutForm.image && (
                       <div className="space-y-3 pt-2 border-t border-slate-200/80 dark:border-slate-700/80">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            {t('Photo display style', 'तस्बिर देखाउने शैली')}
+                          </label>
+                          <select
+                            value={aboutForm.image_display_mode || 'foreground'}
+                            onChange={e => setAboutForm({
+                              ...aboutForm,
+                              image_display_mode: e.target.value as AboutSection['image_display_mode']
+                            })}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+                          >
+                            <option value="foreground">
+                              {t('Foreground photo — hover, focus, or tap to read', 'अगाडि तस्बिर — होभर, फोकस वा थिचेर विवरण पढ्नुहोस्')}
+                            </option>
+                            <option value="background">
+                              {t('Background photo behind readable text', 'पढ्न मिल्ने अक्षर पछाडि पृष्ठभूमि तस्बिर')}
+                            </option>
+                          </select>
+                        </div>
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                             {t('Background Position', 'पृष्ठभूमि स्थिति')}

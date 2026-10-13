@@ -69,6 +69,7 @@ export const AboutContentEditor: React.FC<AboutContentEditorProps> = ({
     alt: '',
     caption: ''
   });
+  const [inlineImageUrl, setInlineImageUrl] = useState('');
   const [editingTokenIndex, setEditingTokenIndex] = useState<number | null>(null);
 
   // Current value and setter based on active tab
@@ -142,6 +143,7 @@ export const AboutContentEditor: React.FC<AboutContentEditorProps> = ({
 
   // Open modal for new image insertion
   const handleOpenInsertModal = () => {
+    setInlineImageUrl('');
     setModalImageState({
       url: '',
       align: 'right',
@@ -158,6 +160,7 @@ export const AboutContentEditor: React.FC<AboutContentEditorProps> = ({
     const item = currentInlineImages[idx];
     if (!item) return;
     setModalImageState(item.data);
+    setInlineImageUrl(/^https?:\/\//i.test(item.data.url) ? item.data.url : '');
     setEditingTokenIndex(idx);
     setIsImageModalOpen(true);
   };
@@ -564,8 +567,8 @@ export const AboutContentEditor: React.FC<AboutContentEditorProps> = ({
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     {t(
-                      'Supports PNG, JPG, JPEG (Max 1MB). Flow image with text using alignment and size.',
-                      'PNG, JPG, JPEG (अधिकतम १MB)। तस्बिर र अक्षरको उपयुक्त संयोजन मिलाउनुहोस्।'
+                      'Upload JPG, PNG, or GIF (Max 1MB), or use a direct HTTP(S) image link.',
+                      'JPG, PNG वा GIF (अधिकतम १MB) अपलोड गर्नुहोस् वा HTTP(S) तस्बिर लिंक प्रयोग गर्नुहोस्।'
                     )}
                   </p>
                 </div>
@@ -582,22 +585,54 @@ export const AboutContentEditor: React.FC<AboutContentEditorProps> = ({
             {/* Step 1: Upload Image (Max 1MB, JPG/PNG) OR Select Existing */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                {t('1. Photo Selection & Upload (Max 1 MB, PNG/JPG/JPEG)', '१. तस्बिर छनोट वा अपलोड (अधिकतम १ MB, PNG/JPG/JPEG)')}
+                {t('1. Photo Upload or Image Link (Max 1 MB upload)', '१. तस्बिर अपलोड वा लिंक (अपलोड अधिकतम १ MB)')}
               </label>
 
               <CmsImageUploader
                 lang={lang}
                 label={t('Upload Archival or Institutional Photo', 'ऐतिहासिक वा संस्थागत तस्बिर अपलोड गर्नुहोस्')}
-                description={t('Strictly verified for PNG/JPG format under 1MB limit.', '१MB भन्दा कम आकारको PNG/JPG ढाँचा।')}
+                description={t('Upload JPG, PNG, or GIF, or paste an image URL below.', 'JPG, PNG वा GIF अपलोड गर्नुहोस् वा तल तस्बिर URL राख्नुहोस्।')}
                 imageUrl={modalImageState.url}
-                onImageChange={(url) => setModalImageState((prev) => ({ ...prev, url }))}
+                onImageChange={(url) => {
+                  setModalImageState((prev) => ({ ...prev, url }));
+                  setInlineImageUrl('');
+                }}
                 onImageRemove={() => setModalImageState((prev) => ({ ...prev, url: '' }))}
                 maxSizeMB={1}
-                allowedFormats={['jpg', 'jpeg', 'png']}
+                allowedFormats={['jpg', 'jpeg', 'png', 'gif']}
                 category="about_image"
                 aspectRatioLabel="Natural / 4:3 / 16:9"
                 onShowToast={onShowToast}
               />
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="url"
+                  value={inlineImageUrl}
+                  onChange={(event) => setInlineImageUrl(event.target.value)}
+                  placeholder="https://example.com/school-photo.gif"
+                  aria-label={t('Direct image URL', 'तस्बिरको URL')}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const parsedUrl = new URL(inlineImageUrl.trim());
+                      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+                        throw new Error('Unsupported URL protocol');
+                      }
+                      setModalImageState((prev) => ({ ...prev, url: parsedUrl.toString() }));
+                      onShowToast(t('Image link added. Preview it before saving.', 'तस्बिर लिंक थपियो। सुरक्षित गर्नुअघि पूर्वावलोकन गर्नुहोस्।'));
+                    } catch {
+                      onShowToast(t('Enter a valid image link starting with http:// or https://.', 'http:// वा https:// बाट सुरु हुने मान्य तस्बिर लिंक राख्नुहोस्।'));
+                    }
+                  }}
+                  className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  {t('Use image link', 'तस्बिर लिंक प्रयोग गर्नुहोस्')}
+                </button>
+              </div>
 
               {/* Quick Preset Selector for common school photos */}
               <div>

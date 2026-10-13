@@ -77,6 +77,7 @@ export const CmsImageUploader: React.FC<CmsImageUploaderProps> = ({
         const base64Data = e.target?.result as string;
         if (!base64Data) {
           setIsUploading(false);
+          onShowToast(t('Could not read the selected image.', 'छानिएको तस्बिर पढ्न सकिएन।'));
           return;
         }
 
@@ -99,23 +100,18 @@ export const CmsImageUploader: React.FC<CmsImageUploaderProps> = ({
             base64Data,
             category: category || 'general'
           });
-          if (uploadRes.success) {
-            onImageChange(uploadRes.url || base64Data);
+          if (uploadRes.success && uploadRes.url) {
+            onImageChange(uploadRes.url);
             onShowToast(t('Image uploaded and verified successfully!', 'तस्बिर सफलतापूर्वक अपलोड तथा प्रमाणित गरियो!'));
             setIsUploading(false);
             return;
-          } else if (uploadRes.error) {
-            onShowToast(uploadRes.error);
-            setIsUploading(false);
-            return;
           }
-        } catch {
-          // Fallback to client base64 if offline/preview
+          onShowToast(uploadRes.error || t('Image upload failed. Please try again.', 'तस्बिर अपलोड असफल भयो। कृपया पुनः प्रयास गर्नुहोस्।'));
+        } catch (error) {
+          onShowToast(error instanceof Error
+            ? error.message
+            : t('Image upload failed. Check your connection and try again.', 'तस्बिर अपलोड असफल भयो। इन्टरनेट जाँच गरी पुनः प्रयास गर्नुहोस्।'));
         }
-
-        // Direct fallback
-        onImageChange(base64Data);
-        onShowToast(t('Image loaded successfully!', 'तस्बिर सफलतापूर्वक लोड गरियो!'));
         setIsUploading(false);
       };
       reader.onerror = () => {

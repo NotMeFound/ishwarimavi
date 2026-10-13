@@ -2199,6 +2199,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
           gallery={gallery}
           onUpdateGallery={onUpdateGallery}
           onShowToast={showToast}
+          canCreate={can('gallery.create')}
+          canUpdate={can('gallery.update')}
+          canDelete={can('gallery.delete')}
         />
       )}
 
